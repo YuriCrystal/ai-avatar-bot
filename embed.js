@@ -21,6 +21,15 @@
   var startOpen = (me && me.getAttribute('data-open') !== 'false'); // 預設一進來就展開
   var widgetOrigin = (function () { try { return new URL(widgetUrl, location.href).origin; } catch (e) { return '*'; } })();
 
+  // 把可設定項帶進 widget：皮=model / 肉的語音後端=api / 內容=knowledge / 聲線=voice
+  var cfg = new URLSearchParams();
+  ['model', 'api', 'knowledge', 'voice'].forEach(function (k) {
+    var v = me && me.getAttribute('data-' + k);
+    if (v) cfg.set(k, v);
+  });
+  var cfgQs = cfg.toString();
+  var iframeSrc = widgetUrl + (cfgQs ? (widgetUrl.indexOf('?') < 0 ? '?' : '&') + cfgQs : '');
+
   var EXPANDED = { w: 340, h: 480 };
   var NS_OUT = 'avatar-widget-host'; // 父 → 子
   var NS_IN  = 'avatar-widget';      // 子 → 父
@@ -35,7 +44,7 @@
 
   // 3) iframe（虛擬人本體）
   var iframe = document.createElement('iframe');
-  iframe.src = widgetUrl;
+  iframe.src = iframeSrc;
   iframe.title = 'AI 虛擬人助理';                 // 無障礙：給 iframe 一個名字
   iframe.setAttribute('allow', 'microphone; autoplay'); // 語音輸入 + 音訊播放
   iframe.setAttribute('allowtransparency', 'true');

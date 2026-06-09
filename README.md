@@ -1,7 +1,10 @@
 # AI 虛擬人 Widget（Live2D 語音助理）
 
-> 一個可以「一行 `<script>` 嵌入任何網站」的右下角 Live2D 語音 AI 虛擬人元件。
-> 你可以對她說話，她會聽懂、回答、開口說話並即時對嘴。語音與大腦大多在瀏覽器本機運行。
+> 一個「一行 `<script>` 嵌入任何網站」的右下角 Live2D 語音 AI 虛擬人元件。
+> 你可以對她說話，她會聽懂、回答、開口說話並即時對嘴。
+>
+> 設計成「**引擎（肉）＋ 可換的皮（角色模型）＋ 內容（知識庫）**」：核心通用，角色與內容用 `data-*` 自己換。
+> **預設純前端、免後端、不依賴任何外部網域**（語音用瀏覽器內建；想要更自然的神經語音再選配一支 function）。
 
 🔗 線上 Demo：<https://ai-avatar-bot-two.vercel.app>（請用 **Chrome 桌機**開啟）
 
@@ -27,21 +30,32 @@
 | `api/tts.js` | Vercel serverless function：取得神經語音 MP3 |
 | `m1-standalone.html` | 早期里程碑的單檔版（純參考，可刪） |
 
-純前端（HTML/JS）＋ **一支 serverless function**，無資料庫。
+預設**純前端（HTML/JS）**就能跑；神經語音才需要那支 serverless function（選配）。無資料庫。
 
-## 🚀 本機跑法
+## 📥 安裝（三種方式，由簡到進階）
 
-神經語音需要 `/api/tts` 這支 function，所以本機請用 Vercel CLI：
+### 方式 1 — 自帶安裝（推薦：純前端、免後端、不依賴任何外部網域）
+把 `widget.html`、`embed.js`、`knowledge.js` 三個檔放進**你自己的網站**，貼一行：
+```html
+<script src="/path/embed.js"
+        data-model="你的-live2d.model3.json"
+        data-knowledge="你的-faq.json"></script>
+```
+全部在訪客瀏覽器裡跑，語音用瀏覽器內建（zh-TW）。**零後端、零金鑰、零雲端成本。**
 
-```bash
-npm install
-npm i -g vercel
-vercel dev          # http://localhost:3000
+### 方式 2 — 託管一行（最快試玩）
+直接引用別人已部署好的 `embed.js`（⚠ 運算與流量算在那個部署擁有者頭上）：
+```html
+<script src="https://你的部署.vercel.app/embed.js"></script>
 ```
 
-> 若只用 `python -m http.server` 之類的純靜態伺服器：除了「神經語音」之外都能跑（神經語音會自動退回瀏覽器內建語音）。
-
-部署：`vercel --prod`（會自動安裝相依、部署 function）。
+### 方式 3 — 完整版含「神經語音」（較自然的真人感嗓音）
+神經語音需要 `api/tts.js`（serverless function）。把整包部署到 Vercel：
+```bash
+npm install
+vercel --prod          # 本機開發：vercel dev
+```
+沒設 `data-api` 時 widget 會自動試同站的 `api/tts`，抓不到就退回瀏覽器語音。
 
 ## 🌐 瀏覽器需求
 
@@ -49,10 +63,20 @@ vercel dev          # http://localhost:3000
 - 想啟用 🧠 瀏覽器內 LLM：需 **WebGPU**（Chrome 113+）
 - 麥克風（語音輸入用）；TTS 與 LLM 需要 **HTTPS**（或 localhost）
 
-## ⚙️ 設定
+## ⚙️ 設定（`embed.js` 的 `data-*` 屬性）
 
-- 語音聲線：`widget.html` 內的 `NEURAL_VOICE`（預設 `zh-TW-HsiaoChenNeural`）。
-- `/api/tts` 來源限制：function 預設只允許「與自己同網域」的來源呼叫；可用環境變數 `TTS_ALLOWED_HOSTS`（逗號分隔）加入其他允許的網域。
+| 屬性 | 作用 | 預設 |
+|---|---|---|
+| `data-model` | **皮**：Live2D `.model3.json` 網址 | 內建 Haru 範例 |
+| `data-knowledge` | **內容**：知識庫 JSON 網址（陣列 `[{q,kw,a}]`） | 內建 `knowledge.js` |
+| `data-api` | **肉**：神經語音後端端點；不設＝純瀏覽器語音 | 試同站 `api/tts` |
+| `data-voice` | 神經語音聲線（需後端支援） | `zh-TW-HsiaoChenNeural` |
+| `data-widget` | `widget.html` 的網址 | 跟 `embed.js` 同目錄 |
+| `data-open` | 是否一進站就展開（`false`＝先收成泡泡） | `true` |
+
+對外 JS API：`window.AvatarWidget.open() / close() / say(text)`。
+
+> 神經語音後端 `api/tts.js` 預設只接受「同網域來源」呼叫（防被當免費 TTS proxy）；可用環境變數 `TTS_ALLOWED_HOSTS`（逗號分隔）加白名單。**公開部署務必在 Vercel 開用量上限。**
 
 ---
 

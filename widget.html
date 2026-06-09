@@ -89,7 +89,12 @@
   </script>
 
   <script>
-  const MODEL_URL = 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json';
+  // ===== 可設定（由 embed.js 透過 query 帶入）：皮=模型 / 肉的語音=後端 / 內容=知識庫 =====
+  const CFG = new URLSearchParams(location.search);
+  const MODEL_URL = CFG.get('model') || 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json';
+  const TTS_ENDPOINT = CFG.get('api') || 'api/tts';   // 沒設→試同站相對路徑；抓不到→自動退回瀏覽器語音（純前端可用）
+  const KNOWLEDGE_URL = CFG.get('knowledge') || '';
+  if (KNOWLEDGE_URL) { fetch(KNOWLEDGE_URL).then(r => r.json()).then(kb => { if (Array.isArray(kb)) window.KB = kb; }).catch(() => {}); }
 
   // ===== 模組層狀態 =====
   let model = null, app = null;
@@ -98,7 +103,8 @@
   let ttsMuted = false, ttsRate = 1.0, ttVoice = null;
   let audioMouth = 0, useAudioMouth = false, audioCtx = null;
   let speakSeq = 0, currentSource = null, currentRaf = 0; // 控制「點第二下打斷第一下」
-  const NEURAL_VOICE = 'zh-TW-HsiaoChenNeural'; // 微軟神經語音「曉臻」
+  let neuralDisabled = false; // 抓不到神經語音後端就鎖定瀏覽器語音，避免每句都打 404
+  const NEURAL_VOICE = CFG.get('voice') || 'zh-TW-HsiaoChenNeural'; // 微軟神經語音「曉臻」（可用 data-voice 覆蓋）
   let recognition = null, listening = false;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -161,9 +167,12 @@
     postToParent('speaking', { text });
     if (ttsMuted) return;
     stopSpeaking();                    // 立刻打斷上一段
+    if (neuralDisabled) { speakBrowser(text); return; }   // 沒有神經語音後端 → 直接用瀏覽器語音
     speakNeural(text, myseq).catch((e) => {
       if (myseq !== speakSeq) return;  // 已被更新的點擊取代 → 不要退回播放
-      console.warn('神經語音失敗，退回瀏覽器語音：', e && e.message);
+      const msg = (e && e.message) || '';
+      if (/http 4\d\d|Failed to fetch|NetworkError|Load failed/i.test(msg)) neuralDisabled = true; // 結構性失敗(無後端/CORS/被擋)→不再試神經語音
+      console.warn('神經語音失敗，退回瀏覽器語音：', msg);
       useAudioMouth = false;
       speakBrowser(text);
     });
@@ -173,7 +182,8 @@
   async function speakNeural(text, seq) {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
-    const resp = await fetch('/api/tts?voice=' + encodeURIComponent(NEURAL_VOICE) + '&text=' + encodeURIComponent(text));
+    const sep = TTS_ENDPOINT.indexOf('?') < 0 ? '?' : '&';
+    const resp = await fetch(TTS_ENDPOINT + sep + 'voice=' + encodeURIComponent(NEURAL_VOICE) + '&text=' + encodeURIComponent(text));
     if (seq !== speakSeq) return;                       // 抓回來時已被新點擊取代 → 放棄（避免重疊）
     if (!resp.ok) throw new Error('http ' + resp.status);
     const arr = await resp.arrayBuffer();
