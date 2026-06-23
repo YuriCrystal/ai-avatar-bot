@@ -157,7 +157,7 @@
   if (KNOWLEDGE_URL) { fetch(KNOWLEDGE_URL).then(r => r.json()).then(kb => { if (Array.isArray(kb)) window.KB = kb; }).catch(() => {}); }
 
   // 皮的引擎判斷：data-vrm 指向 .vrm → 走 3D(VRM)；否則 data-model(.model3.json) → 走 2D(Live2D)
-  const VRM_URL = CFG.get('vrm') || (/\.vrm($|\?)/i.test(MODEL_URL) ? MODEL_URL : '');
+  let VRM_URL = CFG.get('vrm') || (/\.vrm($|\?)/i.test(MODEL_URL) ? MODEL_URL : ''); // let：拖放自己的 VRM 時可換
   const ENGINE  = VRM_URL ? '3d' : '2d';
   // 切換用：embedder 兩個皮都給(data-model + data-vrm) → 長出 2D/3D 切換鈕。
   // 預設引擎：data-engine 優先；否則有明確 2D 皮就 2D、只有 3D 就 3D。
@@ -485,6 +485,24 @@
       if (eb) { eb.style.display = ''; eb.onclick = () => setEngine(_engineMode === '3d' ? '2d' : '3d'); }
     }
   }
+
+  // ===== 拖放自己的 VRM：把 .vrm 拖到角色上就直接換成你的 3D 角色（零改 code）=====
+  function loadVRMFile(file) {
+    if (!file || !/\.vrm$/i.test(file.name)) { showBubble('請拖一個 .vrm 檔喔'); return; }
+    try { if (VRM_URL && VRM_URL.indexOf('blob:') === 0) URL.revokeObjectURL(VRM_URL); } catch (e) {}
+    VRM_URL = URL.createObjectURL(file);
+    const eb = document.getElementById('btn-engine');          // 換上後也顯示 2D/3D 切換鈕
+    if (eb) { eb.style.display = ''; if (!eb.onclick) eb.onclick = () => setEngine(_engineMode === '3d' ? '2d' : '3d'); }
+    _engineMode = null;                                         // 強制重 boot（即使已在 3D）
+    setEngine('3d');
+    showBubble('換上你的角色了！🎭');
+  }
+  ['dragenter', 'dragover'].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); }));
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) loadVRMFile(f);
+  });
 
   // ===== 3D 皮：VRM（three + three-vrm，ESM 動態 import）=====
   async function bootVRM() {
