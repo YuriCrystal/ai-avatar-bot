@@ -19,6 +19,7 @@
 - **Live2D animated character** with real-time **lip-sync** (mouth driven by actual audio volume)
 - **Sentence-by-sentence speech**: long answers are chunked — she starts speaking the first sentence while prefetching the next; with the 🧠 in-browser LLM she **speaks while still generating**
 - **Emotion expressions (3D)**: her face follows the answer (happy / surprised / sorry), easing back to neutral after speaking
+- **Two personality modes**: default "guide assistant"; `data-mode="companion"` turns her into a **companion** = continuous conversation (auto-listens again after she finishes) + memory (remembers your name and past chat; stored only in the visitor's browser, say "忘記我" / "forget me" to wipe)
 - **Voice input (STT)**: browser built-in speech recognition; or just **type** (Enter / ➤ to send, IME-composition safe) — answers still come back as voice + lip-sync
 - **Voice output (TTS)**: neural voice (natural female voice), auto-fallback to the browser's built-in voice
 - **Brain**: knowledge-base retrieval (instant, zero API keys) + optional in-browser LLM (WebLLM, zero API keys)
@@ -105,6 +106,7 @@ Drag your `.vrm` file **onto the avatar** — it instantly becomes your 3D chara
 | `data-model` | **Skin (2D)**: Live2D `.model3.json` URL | Built-in Haru sample |
 | `data-vrm` | **Skin (3D)**: VRM `.vrm` URL; setting it switches to the 3D (three-vrm) engine; supports drag & drop / your own VRoid character | none (unset = 2D Live2D) |
 | `data-engine` | Default engine `2d` / `3d`; **give both `data-model` + `data-vrm` and the widget grows a live 2D/3D toggle** | `2d` if a 2D skin exists, else `3d` |
+| `data-mode` | **Personality**: `assistant` guide / `companion` (💬 one-tap continuous conversation + local memory) | `assistant` |
 | `data-knowledge` | **Content**: knowledge-base JSON URL (array of `[{q,kw,a}]`) | built-in `knowledge.js` |
 | `data-api` | **Voice backend**: neural TTS endpoint; unset = browser voice only | tries same-origin `api/tts` |
 | `data-voice` | Neural voice name (backend must support it) | `zh-TW-HsiaoChenNeural` |
@@ -144,6 +146,7 @@ This project's own code is **MIT** (see `LICENSE`). It **depends on** the follow
 | Voice input (STT) | Microphone audio → browser vendor's cloud (Google, for Chrome) |
 | Voice output (TTS) | Text to speak → your `/api/tts` → Microsoft's unofficial TTS endpoint |
 | Brain (LLM / retrieval) | **Local**, never leaves the browser |
+| Memory (companion mode) | **Local**: visitor's browser localStorage, never uploaded; say "forget me" to wipe |
 
 This project stores no user data itself; note that hosting platforms (e.g. Vercel) may keep function request logs by default.
 

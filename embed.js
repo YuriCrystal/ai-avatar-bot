@@ -34,7 +34,7 @@
 
   // 把可設定項帶進 widget：皮=model / 肉的語音後端=api / 內容=knowledge / 聲線=voice
   var cfg = new URLSearchParams();
-  ['model', 'vrm', 'api', 'knowledge', 'voice', 'ollama', 'llmmodel', 'fit'].forEach(function (k) {
+  ['model', 'vrm', 'api', 'knowledge', 'voice', 'ollama', 'llmmodel', 'fit', 'mode'].forEach(function (k) {
     var v = me && me.getAttribute('data-' + k);
     if (v) cfg.set(k, v);
   });

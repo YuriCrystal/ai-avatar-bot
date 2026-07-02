@@ -175,6 +175,44 @@
   const has3D = !!VRM_URL;
   const startMode = CFG.get('engine') || (has2D ? '2d' : (has3D ? '3d' : '2d'));
 
+  // ===== 兩種人格模式（data-mode）：assistant＝導覽助理（預設、原行為）；companion＝陪伴模式（記憶＋連續對話）=====
+  const MODE = (CFG.get('mode') || '').toLowerCase() === 'companion' ? 'companion' : 'assistant';
+  // 記憶（陪伴模式限定）：只存訪客自己瀏覽器的 localStorage，零後端、不上傳；說「忘記我」即清除
+  const MEM = {
+    key: 'avatar-widget-mem',
+    on: MODE === 'companion',
+    data: { name: '', visits: 0, last: 0, history: [] },
+    load() {
+      if (!this.on) return;
+      try { const j = JSON.parse(localStorage.getItem(this.key) || 'null'); if (j && typeof j === 'object') this.data = Object.assign(this.data, j); } catch (e) {}
+      this.data.visits = (this.data.visits || 0) + 1;
+      this.save();
+    },
+    save() { if (!this.on) return; try { this.data.last = Date.now(); localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) {} },
+    addTurn(role, content) {
+      if (!this.on || !content) return;
+      this.data.history.push({ role, content: String(content).slice(0, 200) });
+      if (this.data.history.length > 12) this.data.history.splice(0, this.data.history.length - 12); // 只留最近 6 輪
+      this.save();
+    },
+    captureName(text) {
+      if (!this.on) return;
+      const m = /(?:我叫|我是|叫我)\s*([^\s，。、,.!！?？的]{1,10})/.exec(text || '');
+      if (m && !/誰|什麼|不知|沒有/.test(m[1])) { this.data.name = m[1]; this.save(); }
+    },
+    wipe() { this.data = { name: '', visits: 1, last: 0, history: [] }; try { localStorage.removeItem(this.key); } catch (e) {} }
+  };
+  MEM.load();
+  // 開場歡迎詞：陪伴模式會認得回訪的人（記憶只在訪客自己的瀏覽器）
+  function welcomeText() {
+    if (MEM.on && MEM.data.visits > 1) {
+      return (MEM.data.name ? MEM.data.name + '，' : '') + '歡迎回來～這是我們第 ' + MEM.data.visits + ' 次見面！點 💬 繼續聊，我記得我們聊過什麼喔';
+    }
+    return (MODE === 'companion')
+      ? '嗨～我是這裡的陪聊虛擬人！點 💬 就能連續對話，我會記得你說過的話（只存在你這台瀏覽器，說「忘記我」就清掉）'
+      : '點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋';
+  }
+
   // ===== 本機 Ollama 大腦（試玩用；只在本機 / localhost 通）=====
   // data-ollama 指向 OpenAI 相容端點（如 http://localhost:11434/v1）；data-llmmodel 指定模型名
   const OLLAMA_BASE  = (CFG.get('ollama') || '').replace(/\/+$/, '');
@@ -197,12 +235,17 @@
     }
   };
   // 共用：檢索到的資料 + 問題 → 給 LLM 的訊息（Ollama 與 WebLLM 共用同一套 RAG 提示）
+  // 陪伴模式：換陪聊 system prompt ＋ 附上最近對話記憶（多輪），她就「記得」你剛剛/上次說過的話
   function buildLLMMessages(q) {
     const ctx = topK(q, 3).map(e => 'Q：' + e.q + '\nA：' + e.a).join('\n---\n');
-    return [
-      { role: 'system', content: '你是「可嵌入任何網站的語音虛擬人元件」的示範助手。主題是教人「怎麼把這個元件裝到自己的網站、怎麼換成自己的角色、怎麼使用」。請用繁體中文、口語、最多兩三句話簡短回答。優先依據【參考資料】回答；資料沒有的就用常識簡短回應，不確定就老實說不知道。\n\n【參考資料】\n' + (ctx || '（無）') },
-      { role: 'user', content: q }
-    ];
+    const RAG = '優先依據【參考資料】回答；資料沒有的就用常識簡短回應，不確定就老實說不知道。\n\n【參考資料】\n' + (ctx || '（無）');
+    const sys = (MODE === 'companion')
+      ? '你是這個網站的陪伴型語音虛擬人，親切、口語、繁體中文、每次最多兩三句。你記得訪客先前的對話' + (MEM.data.name ? '，訪客叫「' + MEM.data.name + '」，可自然稱呼' : '') + '。' + RAG
+      : '你是「可嵌入任何網站的語音虛擬人元件」的示範助手。主題是教人「怎麼把這個元件裝到自己的網站、怎麼換成自己的角色、怎麼使用」。請用繁體中文、口語、最多兩三句話簡短回答。' + RAG;
+    const msgs = [{ role: 'system', content: sys }];
+    if (MEM.on) for (const h of MEM.data.history) msgs.push({ role: h.role, content: h.content });
+    msgs.push({ role: 'user', content: q });
+    return msgs;
   }
 
   // ===== 模組層狀態 =====
@@ -341,7 +384,7 @@
   function speak(text) {
     showBubble(text);
     postToParent('speaking', { text });
-    if (ttsMuted) return;
+    if (ttsMuted) { onUtteranceEnd(); return; }         // 靜音：沒語音可收尾，直接觸發對話迴圈 hook
     const sid = beginSpeech();
     setEmotionFromText(text);          // ①講話帶情緒（3D 表情；要在 beginSpeech 之後，不然被 reset）
     for (const s of splitSentences(text)) pushSpeech(sid, s);
@@ -362,6 +405,14 @@
     pumpSpeech(sid);
   }
   function endSpeech(sid) { if (sid === speakSeq) { speechEnded = true; pumpSpeech(sid); } }
+  // 連續對話（陪伴模式）：她講完 → 自動重開麥。她講話期間不開麥（會聽到自己的聲音）
+  var convoOn = false, noSpeechRuns = 0;
+  function onUtteranceEnd() {
+    handleUser._busy = false;
+    if (convoOn && MODE === 'companion') setTimeout(() => {
+      if (convoOn && !listening && !isSpeaking && !speechPlaying) { noSpeechRuns = 0; startListening(); }
+    }, 450);
+  }
   function prefetchSpeech(sid) {       // 只預抓最前面 2 句（在途 ≤2），護後端限流
     if (sid !== speakSeq || neuralDisabled) return;
     for (const it of speechQ.slice(0, 2)) if (!it.prep && !it.err) it.prep = fetchTTSBuffer(it.text).catch((e) => { it.err = e; return null; });
@@ -369,7 +420,7 @@
   async function pumpSpeech(sid) {
     if (speechPlaying || sid !== speakSeq) return;
     const item = speechQ.shift();
-    if (!item) { if (speechEnded) setEmotion('neutral'); return; }   // 整段講完 → 表情慢慢回中性
+    if (!item) { if (speechEnded) { setEmotion('neutral'); onUtteranceEnd(); } return; }   // 整段講完 → 表情回中性＋(陪伴)重開麥
     speechPlaying = true;
     const done = () => {
       if (sid !== speakSeq) return;
@@ -496,6 +547,7 @@
     return '你問的是「' + q + '」對吧？這題我的知識庫還沒收錄～你可以問我「怎麼安裝」「怎麼換成我的角色」「要不要錢」「麥克風怎麼用」這些喔。';
   }
   // 有大腦時生成更自然的回答；WebLLM 走串流「邊生成邊講」，Ollama／檢索為整段後逐句講
+  function sayAnswer(t) { MEM.addTurn('assistant', t); speak(t); }   // 回答統一走這：陪伴模式順手寫進記憶
   async function respond(q) {
     q = (q || '').trim();
     if (!q) { speak('我好像沒聽清楚，可以再說一次嗎？'); return; }
@@ -504,7 +556,7 @@
       try {
         showBubble('讓我想想…'); if (gesture3D) gesture3D('thinking');
         const out = await window.OLLAMA.chat(buildLLMMessages(q));
-        if (out && out.trim()) { speak(out.trim()); return; }
+        if (out && out.trim()) { sayAnswer(out.trim()); return; }
       } catch (e) { console.warn('Ollama error', e); window.OLLAMA.ready = false; }
     }
     // 2) 瀏覽器內 WebLLM：串流 → 每切出一個完整句就丟進逐句佇列開講（首句延遲大幅縮短）
@@ -523,7 +575,9 @@
           }
         });
         if (out && out.trim()) {
+          MEM.addTurn('assistant', out.trim());
           if (sid && sid === speakSeq) { for (const s of drainSentences(st, true)) pushSpeech(sid, s); endSpeech(sid); }
+          else if (!sid) onUtteranceEnd();              // 靜音：沒有語音收尾 → 手動觸發對話迴圈 hook
           postToParent('speaking', { text: out.trim() });
           return;
         }
@@ -531,41 +585,58 @@
       } catch (e) { console.warn('LLM error', e); }
     }
     // 3) 檢索式後備（零金鑰、永遠可用）
-    speak(brain(q));
+    sayAnswer(brain(q));
   }
 
   function handleUser(text) {
     if (text) showBubble('你：' + text);
+    if (MEM.on && text) {
+      if (/忘記我|清除記憶|forget me/i.test(text)) { MEM.wipe(); speak('好，我把記憶都清掉了，我們重新認識吧！'); return; }
+      MEM.captureName(text);
+      MEM.addTurn('user', text);
+    }
+    handleUser._busy = true;                            // 回答完成前不要自動重開麥（onUtteranceEnd 會清）
     respond(text);
   }
   // 開發檢查用（?dev=1 headless 測試看內部狀態；不影響一般使用）
   window.__emo = () => emo;
-  window.__speech = () => ({ q: speechQ.length, playing: speechPlaying, ended: speechEnded, seq: speakSeq, speaking: isSpeaking, neuralDisabled });
+  window.__speech = () => ({ q: speechQ.length, playing: speechPlaying, ended: speechEnded, seq: speakSeq, speaking: isSpeaking, neuralDisabled, convoOn });
+  window.__mem = () => ({ mode: MODE, on: MEM.on, data: MEM.data });
 
   // ===== STT：聽你說話 =====
   function setMic(on) {
     const b = document.getElementById('btn-mic');
     b.classList.toggle('listening', on);
-    b.textContent = on ? '● 聆聽中' : '🎤 說話';
+    b.textContent = on ? (MODE === 'companion' ? '● 對話中' : '● 聆聽中')
+                       : (MODE === 'companion' ? '💬 對話' : '🎤 說話');
     const sg = document.getElementById('suggestions');
     if (sg) sg.style.display = on ? 'none' : 'flex'; // 聆聽中收起清單
   }
   function startListening() {
-    if (!SR) { speak('你的瀏覽器不支援語音辨識，建議用 Chrome 開喔。'); return; }
+    if (!SR) { speak('你的瀏覽器不支援語音辨識，建議用 Chrome 開喔。'); convoOn = false; return; }
     if (listening && recognition) { recognition.stop(); return; }
-    try { recognition = new SR(); } catch (e) { speak('語音辨識啟動失敗：' + e.message); return; }
+    try { recognition = new SR(); } catch (e) { speak('語音辨識啟動失敗：' + e.message); convoOn = false; return; }
     recognition.lang = 'zh-TW'; recognition.interimResults = true;
     recognition.continuous = false; recognition.maxAlternatives = 1;
-    recognition.onstart  = () => { listening = true; setMic(true); showBubble('聆聽中…請說話 🎙️'); };
+    recognition.onstart  = () => { listening = true; setMic(true); showBubble(convoOn ? '聊吧，我在聽 🎙️（再點一下按鈕結束）' : '聆聽中…請說話 🎙️'); };
     recognition.onresult = (e) => {
       let txt = ''; for (const r of e.results) txt += r[0].transcript;
       const last = e.results[e.results.length - 1];
-      if (last.isFinal) handleUser(txt.trim());
+      if (last.isFinal) { noSpeechRuns = 0; handleUser(txt.trim()); }
       else showBubble('「' + txt + '」…');
     };
     recognition.onerror = (e) => { listening = false; setMic(false);
-      showBubble(e.error === 'not-allowed' ? '我需要麥克風權限才能聽你說話喔。' : '沒聽清楚（' + e.error + '），再試一次。'); };
-    recognition.onend   = () => { listening = false; setMic(false); };
+      if (e.error === 'not-allowed') { convoOn = false; showBubble('我需要麥克風權限才能聽你說話喔。'); return; }
+      if (convoOn && (e.error === 'no-speech' || e.error === 'aborted')) return; // 交給 onend 的續聽邏輯
+      showBubble('沒聽清楚（' + e.error + '），再試一次。'); };
+    recognition.onend   = () => {
+      listening = false; setMic(false);
+      // 連續對話：靜默結束（沒觸發回答）→ 自動再聽；連 3 次沒聲音就休息，避免無限開麥
+      if (convoOn && !handleUser._busy && !isSpeaking && !speechPlaying) {
+        if (++noSpeechRuns >= 3) { convoOn = false; showBubble('好像沒聽到聲音，我先休息～要聊再點 💬'); return; }
+        setTimeout(() => { if (convoOn && !listening && !isSpeaking && !speechPlaying && !handleUser._busy) startListening(); }, 350);
+      }
+    };
     try { recognition.start(); } catch (e) {}
   }
 
@@ -722,7 +793,7 @@
             }, 15000);
           } catch (e) { console.warn('VRMA 手勢庫載入失敗：', e && e.message); }
         })();
-        setTimeout(() => showBubble('點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋'), 700);
+        setTimeout(() => showBubble(welcomeText()), 700);
         postToParent('ready');
       }, undefined, (e) => { console.error(e); postToParent('error', { message: String(e) }); });
 
@@ -863,7 +934,7 @@
       model.on('hit', () => onTap());
       canvas.addEventListener('pointerdown', onTap);
 
-      setTimeout(() => showBubble('點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋'), 700);
+      setTimeout(() => showBubble(welcomeText()), 700);
       postToParent('ready');
       window.__avatarModel = model;
 
@@ -884,7 +955,9 @@
     onTap._lock = true;
     setTimeout(() => { onTap._lock = false; }, 400);
     if (model) try { model.motion('Tap'); } catch (e) {}
-    speak('你好～我是可以嵌入任何網站的語音虛擬人，問我怎麼安裝、怎麼換成你的角色都行！');
+    speak(MODE === 'companion'
+      ? ((MEM.data.name ? MEM.data.name + '～' : '你好～') + '想聊什麼都可以，點 💬 我們就開始！')
+      : '你好～我是可以嵌入任何網站的語音虛擬人，問我怎麼安裝、怎麼換成你的角色都行！');
   }
 
   // ===== 控制列 =====
@@ -913,7 +986,13 @@
       if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); send(); }
     });
   })();
-  document.getElementById('btn-mic').onclick   = () => startListening();
+  document.getElementById('btn-mic').onclick   = () => {
+    if (MODE !== 'companion') { startListening(); return; }
+    convoOn = !convoOn;                                  // 陪伴模式：一鍵開/關「連續對話」
+    if (convoOn) { noSpeechRuns = 0; startListening(); }
+    else { try { recognition && recognition.stop(); } catch (e) {} setMic(false); showBubble('對話先到這～要聊再點 💬'); }
+  };
+  setMic(false);                                         // 依模式套按鈕字樣（🎤 說話 / 💬 對話）
   document.getElementById('btn-mute').onclick  = () => {
     ttsMuted = !ttsMuted;
     const mb = document.getElementById('btn-mute');
