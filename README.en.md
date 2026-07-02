@@ -17,6 +17,8 @@
 ## ✨ Features
 
 - **Live2D animated character** with real-time **lip-sync** (mouth driven by actual audio volume)
+- **Sentence-by-sentence speech**: long answers are chunked — she starts speaking the first sentence while prefetching the next; with the 🧠 in-browser LLM she **speaks while still generating**
+- **Emotion expressions (3D)**: her face follows the answer (happy / surprised / sorry), easing back to neutral after speaking
 - **Voice input (STT)**: browser built-in speech recognition; or just **type** (Enter / ➤ to send, IME-composition safe) — answers still come back as voice + lip-sync
 - **Voice output (TTS)**: neural voice (natural female voice), auto-fallback to the browser's built-in voice
 - **Brain**: knowledge-base retrieval (instant, zero API keys) + optional in-browser LLM (WebLLM, zero API keys)

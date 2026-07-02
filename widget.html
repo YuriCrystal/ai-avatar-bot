@@ -140,10 +140,20 @@
           .catch((err) => { window.LLM.state = 'error'; window.LLM.error = String(err); throw err; });
         return loadingPromise;
       },
-      async chat(messages) {
+      async chat(messages, onDelta) {
         if (!engine) return null;
-        const r = await engine.chat.completions.create({ messages, temperature: 0.4, max_tokens: 220 });
-        return r && r.choices && r.choices[0] && r.choices[0].message.content;
+        if (!onDelta) {
+          const r = await engine.chat.completions.create({ messages, temperature: 0.4, max_tokens: 220 });
+          return r && r.choices && r.choices[0] && r.choices[0].message.content;
+        }
+        // 串流：邊生成邊回吐 token（逐句開講用）——首句不用等整段生成完
+        const stream = await engine.chat.completions.create({ messages, temperature: 0.4, max_tokens: 220, stream: true });
+        let full = '';
+        for await (const c of stream) {
+          const d = c && c.choices && c.choices[0] && c.choices[0].delta && c.choices[0].delta.content;
+          if (d) { full += d; onDelta(d, full); }
+        }
+        return full;
       }
     };
   </script>
@@ -207,6 +217,68 @@
   let recognition = null, listening = false;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let gesture3D = null; // 3D 手勢觸發 hook（bootVRM 設定；2D 模式為 null → 自動 no-op）
+  // ②逐句開講的佇列狀態（var：這檔案有「宣告前就被呼叫」的前例，避 TDZ）
+  var speechQ = [], speechEnded = true, speechPlaying = false, _browserChunkT = 0, tapDone = false;
+  // ①情緒表情狀態：speak 時從文字判斷 → 3D 表情 preset 慢慢 ease 進、講完 ease 回中性（2D 模型表情規格不一，先不套）
+  var emo = { name: 'neutral', target: 0, weight: 0, applied: '' };
+
+  // 從回答文字粗判情緒（規則式、零成本；驚訝 > 難過 > 開心 > 中性）
+  function classifyEmotion(text) {
+    const t = String(text || '');
+    const n = (re) => (t.match(re) || []).length;
+    const surprised = n(/哇|居然|竟然|沒想到|驚|真的嗎|！？|\?!|!\?/g);
+    const sad = n(/抱歉|對不起|可惜|遺憾|失敗|錯誤|沒辦法|不支援|不行|連不上|難過|唉/g);
+    const happy = n(/哈|笑|開心|太好了|好耶|讚|恭喜|歡迎|謝謝|沒問題|完成|成功|一起|囉|喔！|🎉|😊|👋/g);
+    if (surprised && surprised >= Math.max(happy, sad)) return 'surprised';
+    if (sad > happy) return 'sad';
+    if (happy) return 'happy';
+    return 'neutral';
+  }
+  function setEmotion(name) {
+    if (name === emo.name) return;
+    emo.name = name;
+    emo.target = ({ happy: 0.65, surprised: 0.6, sad: 0.5 })[name] || 0;
+    if (name === 'surprised' && gesture3D) gesture3D('surprised'); // 驚訝時順帶一個小反應動作
+  }
+  function setEmotionFromText(text) { setEmotion(classifyEmotion(text)); }
+
+  // 整段文字 → 句子陣列（TTS 逐句抓、邊講邊抓下一句，長答案不用等整段）
+  function splitSentences(text) {
+    const out = [];
+    let buf = '';
+    for (const ch of String(text || '')) {
+      buf += ch;
+      if (/[。！？!?；;\n…]/.test(ch)) { if (buf.trim()) out.push(buf.trim()); buf = ''; }
+      else if (buf.length >= 80) {                        // 沒標點的長串：找逗號斷，不然硬切
+        const cut = Math.max(buf.lastIndexOf('，'), buf.lastIndexOf(','));
+        if (cut > 20) { out.push(buf.slice(0, cut + 1).trim()); buf = buf.slice(cut + 1); }
+        else { out.push(buf.trim()); buf = ''; }
+      }
+    }
+    if (buf.trim()) out.push(buf.trim());
+    const merged = [];                                    // 太短的碎句併進前一句（太短的 TTS 不自然、請求也多）
+    for (const s of out) {
+      if (merged.length && (s.length < 6 || merged[merged.length - 1].length < 6)) merged[merged.length - 1] += s;
+      else merged.push(s);
+    }
+    while (merged.length > 10) {                          // 上限 10 段：護 TTS 限流
+      const m2 = []; for (let i = 0; i < merged.length; i += 2) m2.push(merged[i] + (merged[i + 1] || ''));
+      merged.length = 0; merged.push.apply(merged, m2);
+    }
+    return merged;
+  }
+  // 串流版切句：state.buf 累積 token，切得出完整句就吐出（force＝收尾把殘句也吐）
+  function drainSentences(state, force) {
+    const out = [];
+    let i;
+    while ((i = state.buf.search(/[。！？!?；;\n…]/)) >= 0) {
+      const s = state.buf.slice(0, i + 1).trim();
+      state.buf = state.buf.slice(i + 1);
+      if (s) out.push(s);
+    }
+    if (force && state.buf.trim()) { out.push(state.buf.trim()); state.buf = ''; }
+    return out;
+  }
 
   // ===== 防止被直接開（常見網站 widget 的「禁止直接訪問」提示；純 UX，非安全控制），留 ?dev=1 給開發 =====
   const isEmbedded = window.self !== window.top;
@@ -253,53 +325,97 @@
   }
   if ('speechSynthesis' in window) { speechSynthesis.onvoiceschanged = loadVoice; loadVoice(); }
 
-  // 中止目前正在講的（神經語音音檔 + 瀏覽器 TTS + 對嘴），給「點第二下打斷第一下」用
+  // 中止目前正在講的（逐句佇列 + 神經語音音檔 + 瀏覽器 TTS + 對嘴），給「點第二下打斷第一下」用
   function stopSpeaking() {
+    speakSeq++;                                            // 作廢所有在跑的逐句鏈（pump 看序號就會停）
+    speechQ = []; speechEnded = true; speechPlaying = false;
     try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
-    try { clearTimeout(speakBrowser._t); } catch (e) {}
+    try { clearTimeout(_browserChunkT); } catch (e) {}
     if (currentRaf) { cancelAnimationFrame(currentRaf); currentRaf = 0; }
     if (currentSource) { try { currentSource.onended = null; currentSource.stop(); } catch (e) {} currentSource = null; }
     isSpeaking = false; useAudioMouth = false; audioMouth = 0;
+    setEmotion('neutral');
   }
 
-  // 對外入口：先試 edge-tts 神經語音(真人感 + 精準對嘴)，失敗自動退回瀏覽器語音
+  // 對外入口：整段文字 → 切句進逐句佇列（②講第 1 句時預抓第 2 句 → 長答案幾乎立刻開口）
   function speak(text) {
-    const myseq = ++speakSeq;          // 每次說話一個序號，用來判斷是否已被新點擊取代
     showBubble(text);
     postToParent('speaking', { text });
     if (ttsMuted) return;
-    stopSpeaking();                    // 立刻打斷上一段
-    if (neuralDisabled) { speakBrowser(text); return; }   // 沒有神經語音後端 → 直接用瀏覽器語音
-    speakNeural(text, myseq).catch((e) => {
-      if (myseq !== speakSeq) return;  // 已被更新的點擊取代 → 不要退回播放
-      const msg = (e && e.message) || '';
-      if (/http 4\d\d|Failed to fetch|NetworkError|Load failed/i.test(msg)) neuralDisabled = true; // 結構性失敗(無後端/CORS/被擋)→不再試神經語音
-      console.warn('神經語音失敗，退回瀏覽器語音：', msg);
-      useAudioMouth = false;
-      speakBrowser(text);
-    });
+    const sid = beginSpeech();
+    setEmotionFromText(text);          // ①講話帶情緒（3D 表情；要在 beginSpeech 之後，不然被 reset）
+    for (const s of splitSentences(text)) pushSpeech(sid, s);
+    endSpeech(sid);
   }
 
-  // edge-tts 神經語音：抓 /api/tts 的 MP3，用 Web Audio 播放並以「實際音量」驅動嘴型
-  async function speakNeural(text, seq) {
+  // ===== ②逐句開講引擎：一次一個 session；句子依序講，神經語音在背景先抓下一句 =====
+  function beginSpeech() {
+    stopSpeaking();                    // 打斷上一段（含清佇列、表情回中性）
+    speechQ = []; speechEnded = false; speechPlaying = false; tapDone = false;
+    return ++speakSeq;
+  }
+  function pushSpeech(sid, text) {
+    if (sid !== speakSeq) return;
+    const t = String(text || '').trim(); if (!t) return;
+    speechQ.push({ text: t, prep: null, err: null });
+    prefetchSpeech(sid);
+    pumpSpeech(sid);
+  }
+  function endSpeech(sid) { if (sid === speakSeq) { speechEnded = true; pumpSpeech(sid); } }
+  function prefetchSpeech(sid) {       // 只預抓最前面 2 句（在途 ≤2），護後端限流
+    if (sid !== speakSeq || neuralDisabled) return;
+    for (const it of speechQ.slice(0, 2)) if (!it.prep && !it.err) it.prep = fetchTTSBuffer(it.text).catch((e) => { it.err = e; return null; });
+  }
+  async function pumpSpeech(sid) {
+    if (speechPlaying || sid !== speakSeq) return;
+    const item = speechQ.shift();
+    if (!item) { if (speechEnded) setEmotion('neutral'); return; }   // 整段講完 → 表情慢慢回中性
+    speechPlaying = true;
+    const done = () => {
+      if (sid !== speakSeq) return;
+      speechPlaying = false;
+      prefetchSpeech(sid);
+      pumpSpeech(sid);
+    };
+    let buf = null;
+    if (!neuralDisabled && !item.err) {
+      if (!item.prep) item.prep = fetchTTSBuffer(item.text).catch((e) => { item.err = e; return null; });
+      buf = await item.prep;
+    }
+    if (sid !== speakSeq) return;      // 等音檔期間被新的說話打斷 → 整條放棄
+    if (buf) { prefetchSpeech(sid); playBuffer(buf, done); }
+    else {
+      if (item.err) markNeuralFail(item.err);
+      speakBrowserChunk(item.text, sid, done);
+    }
+  }
+  function markNeuralFail(e) {
+    const msg = (e && e.message) || '';
+    if (/http 429/.test(msg)) { console.warn('TTS 被限流，這句退瀏覽器語音'); return; } // 429 是暫時的，別鎖死神經語音
+    if (/http 4\d\d|Failed to fetch|NetworkError|Load failed/i.test(msg)) neuralDisabled = true; // 結構性失敗(無後端/CORS/被擋)→不再試
+    console.warn('神經語音失敗，退回瀏覽器語音：', msg);
+  }
+
+  // edge-tts 神經語音：抓 /api/tts 的 MP3 → AudioBuffer（給佇列預抓用）
+  async function fetchTTSBuffer(text) {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
     const sep = TTS_ENDPOINT.indexOf('?') < 0 ? '?' : '&';
     const resp = await fetch(TTS_ENDPOINT + sep + 'voice=' + encodeURIComponent(NEURAL_VOICE) + '&text=' + encodeURIComponent(text));
-    if (seq !== speakSeq) return;                       // 抓回來時已被新點擊取代 → 放棄（避免重疊）
     if (!resp.ok) throw new Error('http ' + resp.status);
     const arr = await resp.arrayBuffer();
-    if (seq !== speakSeq) return;
     if (arr.byteLength < 800) throw new Error('audio too small');
-    const audioBuf = await audioCtx.decodeAudioData(arr);
-    if (seq !== speakSeq) return;                       // 解碼後最後確認，舊音檔不搶播
+    return audioCtx.decodeAudioData(arr);
+  }
+  // 播一句（Web Audio + AnalyserNode 以「實際音量」驅動嘴型），播完呼叫 done 換下一句
+  function playBuffer(audioBuf, done) {
     const src = audioCtx.createBufferSource(); src.buffer = audioBuf;
     const analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
     src.connect(analyser); analyser.connect(audioCtx.destination);
     const data = new Uint8Array(analyser.fftSize);
     currentSource = src;
     useAudioMouth = true; isSpeaking = true;
-    if (model) try { model.motion('Tap'); } catch (e) {}
+    if (!tapDone) { tapDone = true; if (model) try { model.motion('Tap'); } catch (e) {} } // Tap 動作一段話只做一次
     const loop = () => {
       if (currentSource !== src) return;                // 不是我在播了就停
       analyser.getByteTimeDomainData(data);
@@ -313,30 +429,33 @@
       if (currentRaf) { cancelAnimationFrame(currentRaf); currentRaf = 0; }
       isSpeaking = false; useAudioMouth = false; audioMouth = 0;
       currentSource = null;
+      done();
     };
     src.start(0);
   }
 
-  // 後備：瀏覽器內建語音(Yating)。對嘴綁「實際是否在發聲」，不依賴各語音不一致的事件
-  function speakBrowser(text) {
-    if (ttsMuted || !('speechSynthesis' in window)) return;
+  // 後備：瀏覽器內建語音(Yating) 逐句版。對嘴用「估時長」驅動，不靠 speechSynthesis.speaking 輪詢
+  // （Chrome 在 cancel 後常回報失準 → 第二次說話嘴巴就不動了）
+  function speakBrowserChunk(text, sid, done) {
+    if (ttsMuted || !('speechSynthesis' in window)) { done(); return; }
     const u = new SpeechSynthesisUtterance(text);
     if (!ttVoice) loadVoice();
     if (ttVoice) u.voice = ttVoice;
     u.lang = (ttVoice && ttVoice.lang) || 'zh-TW';
     u.rate = ttsRate; u.pitch = 1.0;
     u.onboundary = () => { mouthTarget = 0.5 + Math.random() * 0.5; };
-    const stopLip = () => { isSpeaking = false; };
-    u.onend = stopLip;
-    // 嘴型用「估時長」驅動，不靠 speechSynthesis.speaking 輪詢
-    // （Chrome 在 cancel 後常回報失準 → 第二次說話嘴巴就不動了）
-    const estMs = Math.min(16000, Math.max(1500, (text.length * 130) / (ttsRate || 1)));
+    let fin = false;
+    const finish = () => { if (fin) return; fin = true; isSpeaking = false; done(); };
+    u.onend = finish;
+    const estMs = Math.min(16000, Math.max(1200, (text.length * 130) / (ttsRate || 1)));
     const fire = () => {
+      if (sid !== speakSeq) return;                              // 排隊期間被打斷就不講了
       try { speechSynthesis.resume(); } catch (e) {}             // 解 Chrome cancel 後卡住的 bug
       speechSynthesis.speak(u);
-      isSpeaking = true; mouthTarget = 0.7; if (model) try { model.motion('Tap'); } catch (e) {}
-      clearTimeout(speakBrowser._t);
-      speakBrowser._t = setTimeout(stopLip, estMs);              // 保底：時間到閉嘴，不依賴事件
+      isSpeaking = true; mouthTarget = 0.7;
+      if (!tapDone) { tapDone = true; if (model) try { model.motion('Tap'); } catch (e) {} }
+      clearTimeout(_browserChunkT);
+      _browserChunkT = setTimeout(finish, estMs);                // 保底：時間到閉嘴＋換下一句，不依賴事件
     };
     if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(fire, 120); }
     else fire();
@@ -376,33 +495,52 @@
     if (best && bestScore >= 0.16) return best.a;
     return '你問的是「' + q + '」對吧？這題我的知識庫還沒收錄～你可以問我「怎麼安裝」「怎麼換成我的角色」「要不要錢」「麥克風怎麼用」這些喔。';
   }
-  // 有啟用 WebLLM 時，用「檢索到的資料 + LLM」生成更自然的回答；否則退回檢索式
-  async function answer(q) {
+  // 有大腦時生成更自然的回答；WebLLM 走串流「邊生成邊講」，Ollama／檢索為整段後逐句講
+  async function respond(q) {
     q = (q || '').trim();
-    if (!q) return '我好像沒聽清楚，可以再說一次嗎？';
-    // 1) 本機 Ollama 大腦（最聰明，優先）
+    if (!q) { speak('我好像沒聽清楚，可以再說一次嗎？'); return; }
+    // 1) 本機 Ollama 大腦（最聰明，優先；整段生成後逐句講）
     if (window.OLLAMA && window.OLLAMA.enabled && window.OLLAMA.ready) {
       try {
         showBubble('讓我想想…'); if (gesture3D) gesture3D('thinking');
         const out = await window.OLLAMA.chat(buildLLMMessages(q));
-        if (out && out.trim()) return out.trim();
+        if (out && out.trim()) { speak(out.trim()); return; }
       } catch (e) { console.warn('Ollama error', e); window.OLLAMA.ready = false; }
     }
-    // 2) 瀏覽器內 WebLLM（與 Ollama 共用 buildLLMMessages，prompt 只有一份）
+    // 2) 瀏覽器內 WebLLM：串流 → 每切出一個完整句就丟進逐句佇列開講（首句延遲大幅縮短）
     if (window.LLM && window.LLM.state === 'ready') {
       try {
         showBubble('讓我想想…'); if (gesture3D) gesture3D('thinking');
-        const out = await window.LLM.chat(buildLLMMessages(q));
-        if (out && out.trim()) return out.trim();
+        const sid = ttsMuted ? 0 : beginSpeech();       // 靜音時只更新字幕、不進語音佇列
+        const st = { buf: '' };
+        const out = await window.LLM.chat(buildLLMMessages(q), (delta, sofar) => {
+          showBubble(sofar);                            // 邊生成邊更新字幕
+          if (sid) {
+            if (sid !== speakSeq) return;               // 中途被打斷 → 剩下的只當字幕
+            setEmotionFromText(sofar);
+            st.buf += delta;
+            for (const s of drainSentences(st, false)) pushSpeech(sid, s);
+          }
+        });
+        if (out && out.trim()) {
+          if (sid && sid === speakSeq) { for (const s of drainSentences(st, true)) pushSpeech(sid, s); endSpeech(sid); }
+          postToParent('speaking', { text: out.trim() });
+          return;
+        }
+        if (sid) endSpeech(sid);                        // 空回答：收掉這條 session，往下走檢索
       } catch (e) { console.warn('LLM error', e); }
     }
-    return brain(q);
+    // 3) 檢索式後備（零金鑰、永遠可用）
+    speak(brain(q));
   }
 
   function handleUser(text) {
     if (text) showBubble('你：' + text);
-    Promise.resolve().then(async () => { speak(await answer(text)); });
+    respond(text);
   }
+  // 開發檢查用（?dev=1 headless 測試看內部狀態；不影響一般使用）
+  window.__emo = () => emo;
+  window.__speech = () => ({ q: speechQ.length, playing: speechPlaying, ended: speechEnded, seq: speakSeq, speaking: isSpeaking, neuralDisabled });
 
   // ===== STT：聽你說話 =====
   function setMic(on) {
@@ -515,7 +653,8 @@
       const GESTURES = {        // 情境手勢 + 待機變化（body-only，不碰嘴）
         wave: TK + 'Goodbye.vrma',
         bow: 'https://cdn.jsdelivr.net/gh/hirokazuniimoto/virtual-avatar-sdk@main/assets/animations/quick_formal_bow.vrma',
-        thinking: TK + 'Thinking.vrma', look: TK + 'LookAround.vrma', relax: TK + 'Relax.vrma'
+        thinking: TK + 'Thinking.vrma', look: TK + 'LookAround.vrma', relax: TK + 'Relax.vrma',
+        surprised: TK + 'Surprised.vrma'  // ①情緒用：驚訝的小反應（不在點擊問候清單裡）
       };
       const TAP_GESTURES = ['wave', 'bow']; // 點一下隨機：揮手/鞠躬問候（歡迎感）
 
@@ -608,6 +747,20 @@
           em && em.setValue('aa', mv);
           if (blinkT < 0) { nextBlink -= dt; if (nextBlink <= 0) { blinkT = 0; nextBlink = 2 + Math.random() * 4; } }
           else { blinkT += dt / BLINK; em && em.setValue('blink', Math.sin(Math.min(blinkT, 1) * Math.PI)); if (blinkT >= 1) { blinkT = -1; em && em.setValue('blink', 0); } }
+          // ①情緒表情：慢慢 ease 進／出；換情緒時把舊的歸零，缺這個 preset 的模型自動 no-op
+          if (em && (emo.target > 0 || emo.weight > 0.005 || emo.applied)) {
+            if (emo.applied && emo.applied !== emo.name) { try { em.setValue(emo.applied, 0); } catch (e) {} emo.applied = ''; }
+            emo.weight += (emo.target - emo.weight) * Math.min(1, dt * 4);
+            if (emo.weight <= 0.005 && emo.target === 0) { emo.weight = 0; if (emo.applied) { try { em.setValue(emo.applied, 0); } catch (e) {} emo.applied = ''; } }
+            else if (emo.name !== 'neutral') {
+              try {
+                const ex = em.getExpression ? em.getExpression(emo.name) : null;
+                const w = (ex && ex.overrideMouth && String(ex.overrideMouth) !== 'none') ? Math.min(emo.weight, 0.4) : emo.weight; // 別把對嘴蓋死
+                em.setValue(emo.name, w);
+                emo.applied = emo.name;
+              } catch (e) {}
+            }
+          }
           lookTarget.position.set(mx * 0.9, 1.42 - my * 0.55, 1.6); // 眼睛 lookAt 目標跟游標（永遠更新）
           if (!waving) {                                          // 待機：直立、手放下、輕呼吸、頭跟游標
             const h = vrm.humanoid;
