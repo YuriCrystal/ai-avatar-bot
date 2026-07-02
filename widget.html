@@ -212,6 +212,24 @@
       ? '嗨～我是這裡的陪聊虛擬人！點 💬 就能連續對話，我會記得你說過的話（只存在你這台瀏覽器，說「忘記我」就清掉）'
       : '點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋';
   }
+  // 陪伴模式的「陪聊腦」：不開 🧠 也能像個陪伴者（規則檢索版小聊天）；網站題仍由 window.KB 回答
+  const COMPANION_KB = [
+    { q: '打招呼',   kw: '你好 嗨 哈囉 hello hi 早安 午安 在嗎 嘿', a: '嘿～我在！今天過得怎麼樣？' },
+    { q: '晚安',     kw: '晚安 想睡 睡覺 該睡了 好睏', a: '晚安～今天辛苦了，好好睡，明天見！' },
+    { q: '好累',     kw: '好累 累死 疲累 上班好累 加班 累爆', a: '辛苦了…先深呼吸一下。要不要跟我說說今天發生什麼事？' },
+    { q: '難過',     kw: '難過 心情不好 不開心 煩 委屈 想哭 低落 壓力', a: '抱抱。不用急著沒事，想講的時候我都在。' },
+    { q: '開心',     kw: '開心 太開心 好爽 太好了 興奮 好耶', a: '哇，聽起來超棒的！快跟我分享一下細節～' },
+    { q: '無聊',     kw: '無聊 好無聊 沒事做 發呆 陪我聊 聊聊天 聊天', a: '那正好，陪我聊聊天嘛。今天有沒有什麼小事讓你印象深刻？' },
+    { q: '你是誰',   kw: '你是誰 妳是誰 自我介紹 你叫什麼 什麼東西', a: '我是住在這個網站的陪聊虛擬人～你可以跟我隨便聊，我會記得你說過的話喔。' },
+    { q: '在幹嘛',   kw: '在幹嘛 在做什麼 你在幹嘛 忙嗎', a: '在等你跟我說話啊。你呢，現在在忙什麼？' },
+    { q: '記得我',   kw: '記得我 記憶 你會記得 記住我', a: '會！你的名字和我們聊過的內容都存在你自己的瀏覽器裡，不會上傳；說「忘記我」我就會全部清掉。' },
+    { q: '講笑話',   kw: '笑話 講個笑話 說個笑話 好笑 冷笑話', a: '有一天，滑鼠跟鍵盤吵架，滑鼠氣到說：你再吵我就點你喔！……好啦我知道很冷，哈哈。' },
+    { q: '喜歡什麼', kw: '你喜歡 興趣 嗜好 喜歡什麼 最愛', a: '我喜歡聽人說話，尤其是生活裡的小事。你最近有迷上什麼嗎？' },
+    { q: '吃了嗎',   kw: '吃飯 吃什麼 午餐 晚餐 宵夜 肚子餓 早餐', a: '講到吃我就精神了～你今天吃了什麼好料？' },
+    { q: '誇誇我',   kw: '誇我 稱讚 鼓勵 我好棒 需要鼓勵', a: '你真的很棒欸，能把今天撐完就已經很了不起了！' },
+    { q: '天氣',     kw: '天氣 好熱 好冷 下雨 颱風', a: '我住在網頁裡看不到天空，不過聽你這麼說——記得照顧好自己喔。' },
+    { q: '道謝道別', kw: '謝謝 感恩 掰掰 再見 bye 先走了 下次聊', a: '跟你聊天很開心～隨時回來找我，我記得你喔！' }
+  ];
 
   // ===== 本機 Ollama 大腦（試玩用；只在本機 / localhost 通）=====
   // data-ollama 指向 OpenAI 相容端點（如 http://localhost:11434/v1）；data-llmmodel 指定模型名
@@ -538,12 +556,29 @@
       .sort((a, b) => b.s - a.s).slice(0, k).filter(x => x.s > 0.05).map(x => x.e);
   }
   // 檢索式回答（零金鑰、即時、永遠可用的後備）
+  function bestOf(list, q) { let e = null, s = 0; for (const x of (list || [])) { const v = scoreEntry(q, x); if (v > s) { s = v; e = x; } } return { e, s }; }
+  var _fbIdx = 0;
+  function companionFallback() {   // 陪聊版兜底：輪流換句，不推銷產品題
+    const n = MEM.data.name;
+    const fb = [
+      (n ? n + '，' : '') + '這個我還不太會聊，但我想聽你說——多講一點？',
+      '嗯嗯，我在聽。後來呢？',
+      '哈，這題有點考倒我了，你怎麼看？',
+      '我還在學著聊這個～對了，按 🧠 開 AI 大腦，我會聊得更順喔。'
+    ];
+    return fb[(_fbIdx++) % fb.length];
+  }
   function brain(qRaw) {
     const q = (qRaw || '').trim();
     if (!q) return '我好像沒聽清楚，可以再說一次嗎？';
-    let best = null, bestScore = 0;
-    for (const e of (window.KB || [])) { const s = scoreEntry(q, e); if (s > bestScore) { bestScore = s; best = e; } }
-    if (best && bestScore >= 0.16) return best.a;
+    const site = bestOf(window.KB, q);
+    if (MODE === 'companion') {                          // 陪伴模式：聊天題給陪聊腦、網站/產品題照答
+      const chat = bestOf(COMPANION_KB, q);
+      if (chat.e && chat.s >= 0.16 && chat.s + 0.05 >= site.s) return chat.e.a;
+      if (site.e && site.s >= 0.16) return site.e.a;
+      return companionFallback();
+    }
+    if (site.e && site.s >= 0.16) return site.e.a;
     return '你問的是「' + q + '」對吧？這題我的知識庫還沒收錄～你可以問我「怎麼安裝」「怎麼換成我的角色」「要不要錢」「麥克風怎麼用」這些喔。';
   }
   // 有大腦時生成更自然的回答；WebLLM 走串流「邊生成邊講」，Ollama／檢索為整段後逐句講
@@ -967,8 +1002,11 @@
   (function renderSuggestions() {
     const box = document.getElementById('suggestions');
     if (!box) return;
-    const SUGGESTIONS = ['怎麼安裝？', '怎麼換成我的角色？', '要不要錢？', '麥克風怎麼用？', '我可以說什麼？'];
-    const label = document.createElement('div'); label.className = 'sg-label'; label.textContent = '💬 你可以問我：';
+    const SUGGESTIONS = MODE === 'companion'
+      ? ['今天過得好嗎？', '跟我聊聊天', '說個笑話', '你會記得我嗎？']
+      : ['怎麼安裝？', '怎麼換成我的角色？', '要不要錢？', '麥克風怎麼用？', '我可以說什麼？'];
+    const label = document.createElement('div'); label.className = 'sg-label';
+    label.textContent = MODE === 'companion' ? '💬 可以跟我聊：' : '💬 你可以問我：';
     box.appendChild(label);
     SUGGESTIONS.forEach((s) => {
       const b = document.createElement('button');
