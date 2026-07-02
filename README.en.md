@@ -79,6 +79,13 @@ Drag your `.vrm` file **onto the avatar** — it instantly becomes your 3D chara
 **③ Where do I get a VRM?**
 - **[VRoid Studio](https://vroid.com/studio)** (free) → design your own anime character, export as `.vrm`
 - **[VRoid Hub](https://hub.vroid.com)** / **[Booth](https://booth.pm)** → models made by others
+- **No time to make one? Try an official free sample** (paste the URL into `data-vrm` / `?vrm=`; all verified to work):
+  - `Alicia` (Niconi Solid-chan, 7.8MB, [terms](https://3d.nicovideo.jp/alicia/rule.html))
+    `https://cdn.jsdelivr.net/gh/vrm-c/UniVRM@master/Tests/Models/Alicia_vrm-0.51/AliciaSolid_vrm-0.51.vrm`
+  - `Seed-san` (VirtualCast, [VRM Public License 1.0](https://vrm.dev/en/licenses/1.0/index))
+    `https://cdn.jsdelivr.net/gh/vrm-c/vrm-specification@master/samples/Seed-san/vrm/Seed-san.vrm`
+  - `Sample` (pixiv three-vrm official example)
+    `https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm`
 
 > ⚠ **Licensing**: every `.vrm` embeds usage terms set by its author (commercial use / modification) — check before commercial use; characters you make yourself in VRoid Studio are the simplest case.
 > 📦 **File size**: VRMs are typically 10–30MB — **don't commit them to git**; host on a CDN / GitHub Release / your own site and point `data-vrm` at it.

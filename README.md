@@ -79,6 +79,13 @@ vercel --prod          # 本機開發：vercel dev
 **③ 哪裡拿 VRM？**
 - **[VRoid Studio](https://vroid.com/studio)**（免費）→ 自己捏一個動漫角色、匯出 `.vrm`
 - **[VRoid Hub](https://hub.vroid.com)** / **[Booth](https://booth.pm)** → 別人做好的模型
+- **懶得捏？拿官方免費範例立刻試**（網址直接填給 `data-vrm`／`?vrm=`，皆已實測可跑）：
+  - `Alicia`（ニコニ立体ちゃん，7.8MB，[使用條款](https://3d.nicovideo.jp/alicia/rule.html)）
+    `https://cdn.jsdelivr.net/gh/vrm-c/UniVRM@master/Tests/Models/Alicia_vrm-0.51/AliciaSolid_vrm-0.51.vrm`
+  - `Seed-san`（VirtualCast，[VRM Public License 1.0](https://vrm.dev/en/licenses/1.0/index)）
+    `https://cdn.jsdelivr.net/gh/vrm-c/vrm-specification@master/samples/Seed-san/vrm/Seed-san.vrm`
+  - `Sample`（pixiv three-vrm 官方範例）
+    `https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm`
 
 > ⚠ **授權**：每個 `.vrm` 內嵌作者設定的使用條款（可否商用／修改）——商用前務必確認；自己用 VRoid Studio 捏的最單純。
 > 📦 **檔案大小**：VRM 通常 10–30MB，**別塞進 git**；放 CDN／GitHub Release／自己的網站，用 `data-vrm` 指過去。
