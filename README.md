@@ -8,6 +8,8 @@
 
 🔗 線上 Demo：<https://ai-avatar-bot-two.vercel.app>（請用 **Chrome 桌機**開啟）
 
+![Demo：landing 頁右下角的 Live2D 語音虛擬人](docs/demo-landing.jpg)
+
 ---
 
 ## ✨ 功能
@@ -59,6 +61,8 @@ vercel --prod          # 本機開發：vercel dev
 
 ## 🎭 換成你自己的 3D 角色（VRM）
 
+<img src="docs/demo-3d-vrm.jpg" alt="3D VRM 角色（VRoid 捏的角色拖進網頁即可換）" width="380" align="right">
+
 這個元件**不夾帶任何 3D 角色**（避開授權與檔案大小問題）——3D 皮是「你自己的」。三種導入方式：
 
 **① 拖放試玩（最快，零改 code）**
@@ -74,6 +78,8 @@ vercel --prod          # 本機開發：vercel dev
 
 > ⚠ **授權**：每個 `.vrm` 內嵌作者設定的使用條款（可否商用／修改）——商用前務必確認；自己用 VRoid Studio 捏的最單純。
 > 📦 **檔案大小**：VRM 通常 10–30MB，**別塞進 git**；放 CDN／GitHub Release／自己的網站，用 `data-vrm` 指過去。
+
+<br clear="all">
 
 ## 🌐 瀏覽器需求
 
