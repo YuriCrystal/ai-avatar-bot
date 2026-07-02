@@ -1,5 +1,7 @@
 # AI 虛擬人 Widget（Live2D 語音助理）
 
+**繁體中文** | [English](README.en.md)
+
 > 一個「一行 `<script>` 嵌入任何網站」的右下角 Live2D 語音 AI 虛擬人元件。
 > 你可以對她說話，她會聽懂、回答、開口說話並即時對嘴。
 >
@@ -115,6 +117,7 @@ vercel --prod          # 本機開發：vercel dev
 | **Live2D Cubism Core**（CDN `cubism.live2d.com`） | **專有授權**（Live2D Proprietary Software License）。非開源，商用/再散佈須自行確認 Live2D 條款。 |
 | **Haru 範例模型**（CDN，pixi-live2d-display 測試資產） | Live2D **Free Material License**，**僅供範例**。正式上線請換成你自有合法授權的模型。本 repo 不夾帶模型檔，採 CDN 引用。 |
 | **pixi.js / pixi-live2d-display** | MIT |
+| **three.js / @pixiv/three-vrm** | MIT |
 | **@mlc-ai/web-llm**（WebLLM） | Apache-2.0；下載的模型權重各有授權（Qwen2.5 為其自身條款） |
 | **msedge-tts**（`api/tts.js` 用） | 套件本身開源，但它連線的是**微軟 Edge 朗讀的「非官方」語音端點**（見下方風險） |
 
