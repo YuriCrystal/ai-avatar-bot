@@ -106,14 +106,16 @@
     if (d.type === 'error') console.warn('[avatar] widget error:', d.message);
   });
 
-  // 7) 對外 API：別的程式可以叫她說話 / 開關
+  // 7) 對外 API：別的程式可以叫她說話 / 開關 / 代問一個問題（走大腦回答）
+  function postMsg(type, text) {
+    setOpen(true);
+    iframe.contentWindow && iframe.contentWindow.postMessage(
+      { ns: NS_OUT, type: type, text: String(text || '').slice(0, 600) }, widgetOrigin);
+  }
   window.AvatarWidget = {
     open: function () { setOpen(true); },
     close: function () { setOpen(false); },
-    say: function (text) {
-      setOpen(true);
-      iframe.contentWindow && iframe.contentWindow.postMessage(
-        { ns: NS_OUT, type: 'say', text: String(text || '').slice(0, 600) }, widgetOrigin);
-    }
+    say: function (text) { postMsg('say', text); },   // 直接唸出這段文字
+    ask: function (text) { postMsg('ask', text); }    // 幫使用者問一個問題（跑檢索/大腦、像使用者自己問）
   };
 })();

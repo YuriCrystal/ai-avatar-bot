@@ -113,7 +113,10 @@ vercel --prod          # 本機開發：vercel dev
 | `data-widget` | `widget.html` 的網址 | 跟 `embed.js` 同目錄 |
 | `data-open` | 是否一進站就展開（`false`＝先收成泡泡） | `true` |
 
-對外 JS API：`window.AvatarWidget.open() / close() / say(text)`。
+對外 JS API：`window.AvatarWidget.open() / close() / say(text) / ask(text)`。
+（`say`＝直接唸出這段字；`ask`＝幫使用者問一個問題、會跑檢索／大腦回答，例如 landing 頁點卡片就讓虛擬人開口回答。）
+
+**內容白標（`window.KB_META`）**：在你的 `knowledge.js` 裡設 `window.KB_META = { name, welcome, greeting, sgLabel, suggestions:[…], fallback }`，就能讓「開場白／打招呼／提示鈕／答不出來的兜底」全跟著你的領域走——同一顆引擎可當客服／居家修繕／導覽…（不設＝用預設）。
 
 > 神經語音後端 `api/tts.js` 預設只接受「同網域來源」呼叫（防被當免費 TTS proxy）；可用環境變數 `TTS_ALLOWED_HOSTS`（逗號分隔）加白名單。**公開部署務必在 Vercel 開用量上限。**
 

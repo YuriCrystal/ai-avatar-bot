@@ -113,7 +113,10 @@ Drag your `.vrm` file **onto the avatar** — it instantly becomes your 3D chara
 | `data-widget` | URL of `widget.html` | same directory as `embed.js` |
 | `data-open` | Start expanded (`false` = collapsed bubble) | `true` |
 
-Public JS API: `window.AvatarWidget.open() / close() / say(text)`.
+Public JS API: `window.AvatarWidget.open() / close() / say(text) / ask(text)`.
+(`say` = speak this text verbatim; `ask` = ask a question on the user's behalf — runs retrieval/LLM and answers, e.g. a landing-page card click makes the avatar answer out loud.)
+
+**Content white-labeling (`window.KB_META`)**: in your `knowledge.js`, set `window.KB_META = { name, welcome, greeting, sgLabel, suggestions:[…], fallback }` to make the welcome line, greeting, suggestion chips, and not-found fallback follow your domain — the same engine can be a support bot, home-repair helper, museum guide, etc. (unset = defaults).
 
 > The neural-voice backend `api/tts.js` only accepts **same-origin** calls by default (so it can't be farmed as a free TTS proxy); allowlist extra origins with the `TTS_ALLOWED_HOSTS` env var (comma-separated). **If you deploy publicly, set a spend cap on Vercel.**
 

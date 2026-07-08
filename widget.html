@@ -203,14 +203,16 @@
     wipe() { this.data = { name: '', visits: 1, last: 0, history: [] }; try { localStorage.removeItem(this.key); } catch (e) {} }
   };
   MEM.load();
+  // 內容白標：knowledge.js 可設 window.KB_META = { name, welcome, greeting, fallback, suggestions:[], sgLabel }
+  // 讓「開場白／打招呼／答不出來的兜底／提示鈕」跟著知識庫走，不用改引擎 → 同一顆引擎能當客服/修繕/導覽…
+  const KBM = (typeof window !== 'undefined' && window.KB_META) ? window.KB_META : {};
   // 開場歡迎詞：陪伴模式會認得回訪的人（記憶只在訪客自己的瀏覽器）
   function welcomeText() {
     if (MEM.on && MEM.data.visits > 1) {
       return (MEM.data.name ? MEM.data.name + '，' : '') + '歡迎回來～這是我們第 ' + MEM.data.visits + ' 次見面！點 💬 繼續聊，我記得我們聊過什麼喔';
     }
-    return (MODE === 'companion')
-      ? '嗨～我是這裡的陪聊虛擬人！點 💬 就能連續對話，我會記得你說過的話（只存在你這台瀏覽器，說「忘記我」就清掉）'
-      : '點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋';
+    if (MODE === 'companion') return '嗨～我是這裡的陪聊虛擬人！點 💬 就能連續對話，我會記得你說過的話（只存在你這台瀏覽器，說「忘記我」就清掉）';
+    return KBM.welcome || '點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋';
   }
   // 陪伴模式的「陪聊腦」：不開 🧠 也能像個陪伴者（規則檢索版小聊天）；網站題仍由 window.KB 回答
   const COMPANION_KB = [
@@ -361,6 +363,7 @@
     const d = e.data || {};
     if (d.ns !== 'avatar-widget-host') return;
     if (d.type === 'say') speak(String(d.text || '').slice(0, 600));
+    if (d.type === 'ask') handleUser(String(d.text || '').slice(0, 200));   // 父頁代問（例：landing 點卡片 → 小修回答）
     // 注意：不接受用 postMessage 遠端啟動麥克風（listen），避免惡意父頁偷開麥；麥克風只由使用者點擊觸發
   });
 
@@ -579,6 +582,7 @@
       return companionFallback();
     }
     if (site.e && site.s >= 0.16) return site.e.a;
+    if (KBM.fallback) return KBM.fallback;
     return '你問的是「' + q + '」對吧？這題我的知識庫還沒收錄～你可以問我「怎麼安裝」「怎麼換成我的角色」「要不要錢」「麥克風怎麼用」這些喔。';
   }
   // 有大腦時生成更自然的回答；WebLLM 走串流「邊生成邊講」，Ollama／檢索為整段後逐句講
@@ -992,7 +996,7 @@
     if (model) try { model.motion('Tap'); } catch (e) {}
     speak(MODE === 'companion'
       ? ((MEM.data.name ? MEM.data.name + '～' : '你好～') + '想聊什麼都可以，點 💬 我們就開始！')
-      : '你好～我是可以嵌入任何網站的語音虛擬人，問我怎麼安裝、怎麼換成你的角色都行！');
+      : (KBM.greeting || '你好～我是可以嵌入任何網站的語音虛擬人，問我怎麼安裝、怎麼換成你的角色都行！'));
   }
 
   // ===== 控制列 =====
@@ -1004,9 +1008,10 @@
     if (!box) return;
     const SUGGESTIONS = MODE === 'companion'
       ? ['今天過得好嗎？', '跟我聊聊天', '說個笑話', '你會記得我嗎？']
-      : ['怎麼安裝？', '怎麼換成我的角色？', '要不要錢？', '麥克風怎麼用？', '我可以說什麼？'];
+      : (Array.isArray(KBM.suggestions) && KBM.suggestions.length ? KBM.suggestions
+        : ['怎麼安裝？', '怎麼換成我的角色？', '要不要錢？', '麥克風怎麼用？', '我可以說什麼？']);
     const label = document.createElement('div'); label.className = 'sg-label';
-    label.textContent = MODE === 'companion' ? '💬 可以跟我聊：' : '💬 你可以問我：';
+    label.textContent = MODE === 'companion' ? '💬 可以跟我聊：' : (KBM.sgLabel || '💬 你可以問我：');
     box.appendChild(label);
     SUGGESTIONS.forEach((s) => {
       const b = document.createElement('button');
