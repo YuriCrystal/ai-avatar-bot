@@ -29,7 +29,7 @@ function isAllowed(req) {
   const self = (req.headers.host || '').toLowerCase();
   const extra = (process.env.TTS_ALLOWED_HOSTS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   const allow = new Set([self, ...extra]);
-  const ref = req.headers.referer || req.headers.origin || '';
+  const ref = req.headers.origin || req.headers.referer || '';
   const h = hostOf(ref);
   if (!h) return false;                                   // 沒有來源（curl/腳本）→ 擋
   if (allow.has(h)) return true;
@@ -54,20 +54,40 @@ function rateLimited(req) {
   return e.n > RL_MAX;
 }
 
+async function readJsonBody(req) {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string' || Buffer.isBuffer(req.body)) {
+    const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body;
+    if (Buffer.byteLength(raw) > 4096) throw new Error('body too large');
+    return JSON.parse(raw || '{}');
+  }
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 4096) throw new Error('body too large');
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+}
+
 module.exports = async (req, res) => {
   const origin = req.headers.origin || '';
-  res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
 
   try {
     if (!isAllowed(req)) { res.statusCode = 403; res.end('forbidden: bad origin'); return; }
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+    if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
+    if (req.method !== 'POST') { res.statusCode = 405; res.setHeader('Allow', 'POST, OPTIONS'); res.end('method not allowed'); return; }
     if (rateLimited(req)) { res.statusCode = 429; res.setHeader('Retry-After', '60'); res.end('rate limited'); return; }
 
-    const u = new URL(req.url, 'http://localhost');
-    const text = (u.searchParams.get('text') || '').slice(0, 600).trim();
-    let voice = u.searchParams.get('voice') || 'zh-TW-HsiaoChenNeural';
+    const body = await readJsonBody(req);
+    const text = String(body.text || '').slice(0, 600).trim();
+    let voice = String(body.voice || 'zh-TW-HsiaoChenNeural');
     if (!VOICES.has(voice)) voice = 'zh-TW-HsiaoChenNeural';
     if (!text) { res.statusCode = 400; res.end('missing text'); return; }
 
@@ -86,10 +106,11 @@ module.exports = async (req, res) => {
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // 同句快取一天
+    res.setHeader('Cache-Control', 'private, no-store'); // 對話文字不進共享快取或 CDN 日誌 key
     res.end(buf);
   } catch (e) {
+    console.error('[tts]', e && e.message || e);
     res.statusCode = 502;
-    res.end('tts error: ' + (e && e.message || e));
+    res.end('tts error');
   }
 };

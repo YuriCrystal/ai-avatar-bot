@@ -20,13 +20,13 @@
     <p>右下角虛擬人同時掛了 <b>2D（Live2D haru）</b>＋<b>3D（VRoid VRM）</b>兩個皮，
        控制列會多一顆 <code>2D／3D</code> 切換鈕。</p>
     <p>點那顆鈕切到 <b>3D</b>：<b>點一下角色</b>她會揮手、<b>打字問她</b>講話時會點頭，光影也調暗過了。</p>
-    <p class="note">3D 皮指向本機 <code>vroid_a.vrm</code>；換別的 VRM 改 <code>data-vrm</code> 即可。請用 Chrome 桌機。</p>
+    <p class="note">3D 皮使用 VRM 官方公開範例 Seed-san；換別的 VRM 改 <code>data-vrm</code> 即可。請用 Chrome 桌機。</p>
   </div>
 
   <!-- 同時掛 2D(data-model) + 3D(data-vrm) → 控制列長出 2D/3D 切換鈕 -->
-  <script src="embed.js"
-          data-model="https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json"
-          data-vrm="vroid_a.vrm"
+  <script src="embed.js?v=1.1.0"
+          data-model="https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display@31317b37d5e22955a44d5b11f37f421e94a11269/test/assets/haru/haru_greeter_t03.model3.json"
+          data-vrm="https://cdn.jsdelivr.net/gh/vrm-c/vrm-specification@3942748efbc803b258e288e0f6c993c6bb96cebf/samples/Seed-san/vrm/Seed-san.vrm"
           data-open="true"></script>
 </body>
 </html>

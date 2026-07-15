@@ -1,14 +1,16 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/tts.js", "use": "@vercel/node" },
-    { "src": "*.html", "use": "@vercel/static" },
-    { "src": "embed.js", "use": "@vercel/static" },
-    { "src": "knowledge.js", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/tts", "dest": "/api/tts.js" },
-    { "src": "/", "dest": "/index.html" },
-    { "handle": "filesystem" }
+  "functions": {
+    "api/tts.js": { "maxDuration": 30 }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" }
+      ]
+    }
   ]
 }

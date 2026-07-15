@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>換皮試玩：mao_pro（來自 Open-LLM-VTuber）</title>
+<title>換皮試玩：Mao（Live2D 官方範例）</title>
 <style>
   body{font-family:"Noto Sans TC",system-ui,sans-serif;margin:0;min-height:100vh;
        display:grid;place-items:center;background:linear-gradient(135deg,#eef1ff,#f7f8ff);color:#222033}
@@ -16,16 +16,15 @@
 </head>
 <body>
   <div class="card">
-    <h1>🎭 換皮試玩：<code>mao_pro</code>（來自 Open-LLM-VTuber）</h1>
-    <p>右下角虛擬人現在的「皮」是從 OLV 搬過來的 <code>mao_pro</code> Live2D 角色。</p>
+    <h1>🎭 換皮試玩：<code>Mao</code>（Live2D 官方範例）</h1>
+    <p>右下角虛擬人現在的「皮」是 Live2D 官方 SDK 提供的 <code>Mao</code> 範例角色。</p>
     <p><strong>大腦維持預設（知識庫模式）</strong>，要接哪顆大腦由你自己決定。</p>
-    <p class="note">想換成另一個皮 <code>shizuku</code>：把下面 <code>data-model</code> 改成
-      <code>models/shizuku/shizuku.model3.json</code> 即可。</p>
+    <p class="note">正式上線請換成你擁有使用權的模型，並用 <code>data-model</code> 指向其 <code>model3.json</code>。</p>
   </div>
 
-  <!-- 只換皮：data-model 指向搬進來的 OLV 模型；不設 data-ollama → 大腦保持預設、由使用者自行更新 -->
-  <script src="embed.js"
-          data-model="models/mao_pro/mao_pro.model3.json"
+  <!-- 只換皮：使用固定版本的 Live2D 官方範例；不設 data-ollama → 大腦保持預設 -->
+  <script src="embed.js?v=1.1.0"
+          data-model="https://cdn.jsdelivr.net/gh/Live2D/CubismWebSamples@b1de66b0b1f1cb881d95fb6158622aeb6a2827bd/Samples/Resources/Mao/Mao.model3.json"
           data-open="true"></script>
 </body>
 </html>
