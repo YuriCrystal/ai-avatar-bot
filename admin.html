@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>虛擬人知識庫編輯器</title>
+  <style>
+    :root { color-scheme:light; --brand:#5b54e8; --ink:#202033; --muted:#696a7d; --line:#dedfeb; --ok:#137a55; --bad:#b93838; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f4f5fa; color:var(--ink); font-family:"Noto Sans TC",system-ui,sans-serif; }
+    main { width:min(1120px,calc(100% - 28px)); margin:28px auto; }
+    header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px; }
+    h1 { margin:0 0 5px; font-size:clamp(24px,4vw,38px); }
+    p { margin:0; color:var(--muted); line-height:1.6; }
+    .grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr); gap:16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 8px 24px rgba(31,32,62,.06); }
+    .toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    button,.file-label { appearance:none; border:0; border-radius:10px; min-height:38px; padding:0 13px; display:inline-flex; align-items:center; cursor:pointer; background:#ececf6; color:#414258; font:700 13px inherit; }
+    button.primary { background:var(--brand); color:#fff; }
+    button:focus-visible,.file-label:focus-within,textarea:focus { outline:3px solid rgba(91,84,232,.3); outline-offset:2px; }
+    input[type=file] { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+    textarea { width:100%; min-height:590px; resize:vertical; border:1px solid var(--line); border-radius:12px; padding:13px; color:#2a2a3c; background:#fbfbfe; font:12.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    #status { min-height:42px; border-radius:11px; padding:10px 12px; margin-bottom:12px; background:#f0f1f7; color:var(--muted); font-size:13px; line-height:1.55; }
+    #status.ok { background:#e7f7f0; color:var(--ok); }
+    #status.bad { background:#fdecec; color:var(--bad); }
+    #preview { display:grid; gap:9px; max-height:552px; overflow:auto; }
+    .entry { border:1px solid var(--line); border-radius:12px; padding:11px; }
+    .entry strong { display:block; margin-bottom:5px; font-size:13px; }
+    .entry span { color:var(--muted); font-size:12px; line-height:1.5; }
+    .privacy { margin-top:12px; font-size:12px; }
+    @media(max-width:800px){ header{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}textarea{min-height:440px} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>知識庫編輯器</h1><p>編輯、驗證並匯出可直接給 <code>data-knowledge</code> 使用的 JSON。</p></div>
+    <a href="./" aria-label="回到示範首頁">回示範首頁</a>
+  </header>
+  <div class="grid">
+    <section class="card" aria-label="編輯知識庫">
+      <div class="toolbar">
+        <button class="primary" id="validate" type="button">驗證並預覽</button>
+        <label class="file-label">匯入 JSON<input id="file" type="file" accept="application/json,.json"></label>
+        <button id="download" type="button">下載 knowledge.json</button>
+        <button id="copy" type="button">複製 JSON</button>
+      </div>
+      <textarea id="editor" spellcheck="false" aria-label="知識庫 JSON 編輯區"></textarea>
+      <p class="privacy">內容只在你的瀏覽器中編輯，不會自動上傳或儲存。下載後請部署到自己的網站，再以 <code>data-knowledge</code> 指向該檔案。</p>
+    </section>
+    <aside class="card" aria-label="驗證結果與預覽">
+      <div id="status">尚未驗證。</div>
+      <div id="preview"></div>
+    </aside>
+  </div>
+</main>
+<script src="knowledge.js"></script>
+<script>
+(function () {
+  'use strict';
+  var editor = document.getElementById('editor');
+  var status = document.getElementById('status');
+  var preview = document.getElementById('preview');
+  editor.value = JSON.stringify(Array.isArray(window.KB) ? window.KB : [], null, 2);
+
+  function parseAndValidate() {
+    var data;
+    try { data = JSON.parse(editor.value); } catch (error) { throw new Error('JSON 格式錯誤：' + error.message); }
+    if (!Array.isArray(data)) throw new Error('最外層必須是陣列。');
+    if (data.length > 1000) throw new Error('最多 1000 筆，請拆成較小的知識庫。');
+    data.forEach(function (item, index) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('第 ' + (index + 1) + ' 筆必須是物件。');
+      ['q', 'a'].forEach(function (key) {
+        if (typeof item[key] !== 'string' || !item[key].trim()) throw new Error('第 ' + (index + 1) + ' 筆缺少非空字串「' + key + '」。');
+      });
+      if (item.kw != null && typeof item.kw !== 'string') throw new Error('第 ' + (index + 1) + ' 筆的「kw」必須是字串。');
+    });
+    return data;
+  }
+
+  function showValidation() {
+    try {
+      var data = parseAndValidate();
+      status.className = 'ok'; status.textContent = '驗證成功：共 ' + data.length + ' 筆，可以下載部署。';
+      preview.replaceChildren();
+      data.slice(0, 30).forEach(function (item) {
+        var box = document.createElement('div'); box.className = 'entry';
+        var q = document.createElement('strong'); q.textContent = item.q;
+        var a = document.createElement('span'); a.textContent = item.a;
+        box.append(q, a); preview.appendChild(box);
+      });
+      if (data.length > 30) { var more = document.createElement('p'); more.textContent = '另有 ' + (data.length - 30) + ' 筆未顯示。'; preview.appendChild(more); }
+      return data;
+    } catch (error) {
+      status.className = 'bad'; status.textContent = error.message; preview.replaceChildren(); return null;
+    }
+  }
+
+  document.getElementById('validate').onclick = showValidation;
+  document.getElementById('file').onchange = function (event) {
+    var file = event.target.files && event.target.files[0]; if (!file) return;
+    file.text().then(function (text) { editor.value = text; showValidation(); }).catch(function (error) { status.className = 'bad'; status.textContent = '讀取失敗：' + error.message; });
+  };
+  document.getElementById('download').onclick = function () {
+    var data = showValidation(); if (!data) return;
+    var url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + '\n'], { type:'application/json' }));
+    var link = document.createElement('a'); link.href = url; link.download = 'knowledge.json'; link.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  };
+  document.getElementById('copy').onclick = function () {
+    var data = showValidation(); if (!data) return;
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(function () { status.className = 'ok'; status.textContent = '已複製有效的 JSON。'; });
+  };
+  showValidation();
+})();
+</script>
+</body>
+</html>

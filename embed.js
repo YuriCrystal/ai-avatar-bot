@@ -5,7 +5,7 @@
  *   同網域可用： <script src="embed.js" data-widget="widget.html"></script>
  *
  * 建立右下角 iframe（裝虛擬人）+ 收合泡泡，用 postMessage 與 iframe 溝通，
- * 並開好 microphone 權限。對外提供 window.AvatarWidget = { open, close, say }。
+ * 並開好 microphone 權限。對外提供 window.AvatarWidget API。
  * ===================================================================== */
 (function () {
   'use strict';
@@ -38,7 +38,7 @@
 
   // 把可設定項帶進 widget：皮=model / 肉的語音後端=api / 內容=knowledge / 聲線=voice
   var cfg = new URLSearchParams();
-  ['model', 'vrm', 'api', 'knowledge', 'voice', 'ollama', 'llmmodel', 'fit', 'mode'].forEach(function (k) {
+  ['model', 'vrm', 'api', 'knowledge', 'voice', 'ollama', 'llmmodel', 'fit', 'mode', 'engine', 'lang'].forEach(function (k) {
     var v = me && me.getAttribute('data-' + k);
     if (v) cfg.set(k, v);
   });
@@ -66,6 +66,46 @@
   var iframeLoaded = false;
   var widgetReady = false;
   var pendingMessages = [];
+  var toolRegistry = Object.create(null);
+  var eventListeners = Object.create(null);
+
+  function safeContext(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    var out = {};
+    Object.keys(value).slice(0, 30).forEach(function (key) {
+      var safeKey = String(key).slice(0, 60);
+      var v = value[key];
+      if (v == null || typeof v === 'boolean' || typeof v === 'number') out[safeKey] = v;
+      else if (typeof v === 'string') out[safeKey] = v.slice(0, 800);
+      else if (Array.isArray(v)) out[safeKey] = v.slice(0, 20).map(function (x) { return String(x).slice(0, 160); });
+    });
+    return out;
+  }
+
+  var pageContext = safeContext({
+    title: document.title || '',
+    url: location.origin + location.pathname,
+    description: (document.querySelector('meta[name="description"]') || {}).content || ''
+  });
+
+  function toolMetadata() {
+    return Object.keys(toolRegistry).map(function (name) {
+      var tool = toolRegistry[name];
+      return { name: name, label: tool.label, description: tool.description, keywords: tool.keywords, requiresConfirmation: tool.requiresConfirmation };
+    });
+  }
+
+  function syncContextAndTools() {
+    sendToWidget({ ns: NS_OUT, type: 'context', context: pageContext });
+    sendToWidget({ ns: NS_OUT, type: 'tools', tools: toolMetadata() });
+  }
+
+  function emit(name, detail) {
+    var list = eventListeners[name] || [];
+    list.slice().forEach(function (handler) { try { handler(detail || {}); } catch (e) { console.error('[avatar] event handler error:', e); } });
+    var all = eventListeners['*'] || [];
+    all.slice().forEach(function (handler) { try { handler({ name: name, detail: detail || {} }); } catch (e) { console.error('[avatar] event handler error:', e); } });
+  }
 
   function ensureIframe() {
     if (iframeLoaded) return;
@@ -133,6 +173,21 @@
       widgetReady = true;
       flushMessages();
       sendToWidget({ ns: NS_OUT, type: 'visibility', visible: iframe.style.display !== 'none' });
+      syncContextAndTools();
+    }
+    if (d.type === 'event') emit(d.name, d.properties || {});
+    if (d.type === 'tool-call') {
+      var tool = toolRegistry[d.name];
+      if (!tool) {
+        sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: '找不到這個網站操作' });
+      } else {
+        Promise.resolve().then(function () { return tool.execute(d.input || {}); }).then(function (result) {
+          var message = typeof result === 'string' ? result : (result && result.message) || '已完成「' + tool.label + '」。';
+          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: true, message: String(message).slice(0, 1200) });
+        }).catch(function (error) {
+          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: String(error && error.message || error).slice(0, 500) });
+        });
+      }
     }
     if (d.type === 'error') console.warn('[avatar] widget error:', d.message);
   });
@@ -146,6 +201,72 @@
     open: function () { setOpen(true); },
     close: function () { setOpen(false); },
     say: function (text) { postMsg('say', text); },   // 直接唸出這段文字
-    ask: function (text) { postMsg('ask', text); }    // 幫使用者問一個問題（跑檢索/大腦、像使用者自己問）
+    ask: function (text) { postMsg('ask', text); },   // 幫使用者問一個問題（跑檢索/大腦、像使用者自己問）
+    setContext: function (context) {
+      pageContext = safeContext(context);
+      sendToWidget({ ns: NS_OUT, type: 'context', context: pageContext });
+      return this;
+    },
+    setLocale: function (locale) {
+      sendToWidget({ ns: NS_OUT, type: 'locale', locale: String(locale || '').slice(0, 16) });
+      return this;
+    },
+    setExpression: function (name) {
+      sendToWidget({ ns: NS_OUT, type: 'expression', name: String(name || '').slice(0, 24) });
+      return this;
+    },
+    registerTool: function (definition) {
+      definition = definition || {};
+      var name = String(definition.name || '').replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 64);
+      if (!name) throw new Error('AvatarWidget.registerTool 需要有效的 name');
+      if (typeof definition.execute !== 'function') throw new Error('AvatarWidget.registerTool 需要 execute 函式');
+      toolRegistry[name] = {
+        label: String(definition.label || name).slice(0, 80),
+        description: String(definition.description || '').slice(0, 240),
+        keywords: Array.isArray(definition.keywords) ? definition.keywords.slice(0, 20).map(function (k) { return String(k).toLowerCase().slice(0, 60); }) : [],
+        requiresConfirmation: definition.requiresConfirmation !== false,
+        execute: definition.execute
+      };
+      sendToWidget({ ns: NS_OUT, type: 'tools', tools: toolMetadata() });
+      return this;
+    },
+    unregisterTool: function (name) {
+      delete toolRegistry[String(name || '')];
+      sendToWidget({ ns: NS_OUT, type: 'tools', tools: toolMetadata() });
+      return this;
+    },
+    setHandoff: function (options) {
+      options = options || {};
+      var target = String(options.url || '').slice(0, 1200);
+      var callback = options.onRequest;
+      if (!target && typeof callback !== 'function') throw new Error('AvatarWidget.setHandoff 需要 url 或 onRequest');
+      return window.AvatarWidget.registerTool({
+        name: 'human_handoff',
+        label: String(options.label || '轉接真人客服').slice(0, 80),
+        description: '將目前對話交給真人客服處理',
+        keywords: Array.isArray(options.keywords) ? options.keywords : ['真人客服', '轉真人', '找客服', '人工客服', '專人服務'],
+        requiresConfirmation: options.requiresConfirmation !== false,
+        execute: function (input) {
+          if (typeof callback === 'function') return callback(input);
+          var url = new URL(target, location.href);
+          if (!/^https?:$/.test(url.protocol) && !/^(mailto|tel):$/.test(url.protocol)) throw new Error('不支援的客服網址格式');
+          if (!options.target || options.target === '_self') location.assign(url.href);
+          else window.open(url.href, options.target, 'noopener,noreferrer');
+          return options.successMessage || '已為你開啟真人客服。';
+        }
+      });
+    },
+    on: function (name, handler) {
+      if (typeof handler !== 'function') return this;
+      name = String(name || '*');
+      (eventListeners[name] || (eventListeners[name] = [])).push(handler);
+      return this;
+    },
+    off: function (name, handler) {
+      name = String(name || '*');
+      if (!eventListeners[name]) return this;
+      eventListeners[name] = eventListeners[name].filter(function (item) { return item !== handler; });
+      return this;
+    }
   };
 })();

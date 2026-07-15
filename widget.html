@@ -79,6 +79,35 @@
   .sugg:active { transform:scale(.96); }
   .sugg:focus-visible { outline:2px solid #fff; outline-offset:2px; }
 
+  /* ===== 本次工作階段的聊天紀錄 ===== */
+  #history-panel {
+    position:absolute; inset:10px 10px 104px; z-index:4;
+    display:none; flex-direction:column; overflow:hidden; border-radius:18px;
+    background:rgba(250,250,255,.98); color:var(--ink);
+    box-shadow:0 16px 45px rgba(13,16,35,.3), inset 0 0 0 1px rgba(91,84,232,.12);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  }
+  #history-panel.open { display:flex; }
+  .history-head { min-height:48px; display:flex; align-items:center; gap:8px; padding:8px 10px 8px 14px; border-bottom:1px solid #e7e7f1; }
+  .history-title { flex:1; font-size:14px; font-weight:800; }
+  .history-note { display:block; color:#74758a; font-size:10px; font-weight:500; }
+  .history-action { appearance:none; border:0; border-radius:9px; cursor:pointer; background:#eeeeF8; color:#4b4b62; min-height:30px; padding:0 9px; font-size:12px; font-weight:700; }
+  .history-action:hover { background:#e2e1f6; }
+  .history-action:focus-visible { outline:2px solid var(--brand); outline-offset:1px; }
+  #history-list { flex:1; overflow:auto; padding:12px; overscroll-behavior:contain; scrollbar-width:thin; }
+  .history-empty { margin:35% auto 0; max-width:210px; color:#74758a; text-align:center; font-size:13px; line-height:1.55; }
+  .history-item { display:flex; flex-direction:column; align-items:flex-start; margin:0 0 10px; }
+  .history-item.user { align-items:flex-end; }
+  .history-message { max-width:88%; border-radius:14px 14px 14px 4px; padding:9px 11px; background:#fff; box-shadow:0 2px 8px rgba(28,29,55,.08); font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .history-item.user .history-message { border-radius:14px 14px 4px 14px; background:var(--brand); color:#fff; }
+  .history-tools { display:flex; gap:4px; margin-top:4px; }
+  .history-tool { appearance:none; border:0; background:transparent; color:#696a7d; padding:3px 6px; border-radius:6px; cursor:pointer; font-size:11px; }
+  .history-tool:hover { background:#eaeaf3; color:var(--brand); }
+  .history-confirm { margin-top:7px; display:flex; gap:6px; }
+  .history-confirm button { appearance:none; border:0; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:11px; font-weight:700; }
+  .history-confirm .confirm { background:var(--brand); color:#fff; }
+  .history-confirm .cancel { background:#ececf4; color:#55566c; }
+
   #direct-warn {
     position:absolute; inset:0; display:none; align-items:center; justify-content:center;
     background:#f4f6f8; color:#556; font-size:15px; text-align:center; padding:24px;
@@ -91,6 +120,7 @@
     #type-input { height:34px; padding:0 9px; }
     #suggestions { left:6px; right:6px; bottom:94px; gap:4px; }
     .sugg { font-size:11.5px; padding:5px 9px; }
+    #history-panel { inset:6px 6px 94px; }
   }
   @media (prefers-reduced-motion:reduce) {
     *, *::before, *::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
@@ -101,6 +131,14 @@
   <div id="stage">
     <div id="bubble" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="suggestions"></div>
+    <section id="history-panel" aria-label="聊天紀錄" aria-hidden="true">
+      <div class="history-head">
+        <div class="history-title">聊天紀錄<span class="history-note">只保留在這次開啟期間</span></div>
+        <button class="history-action" id="btn-history-clear" type="button">清除</button>
+        <button class="history-action" id="btn-history-close" type="button" aria-label="關閉聊天紀錄">✕</button>
+      </div>
+      <div id="history-list" role="log" aria-live="polite"></div>
+    </section>
     <div id="control-bar">
       <div class="dock-row">
         <input id="type-input" type="text" maxlength="200" placeholder="打字問我也可以…" aria-label="輸入文字問題" />
@@ -112,6 +150,8 @@
       <button class="ctrl" id="btn-llm"   aria-label="啟用瀏覽器內 AI 大腦（首次需下載模型）" aria-pressed="false"><span aria-hidden="true">🧠</span></button>
       <button class="ctrl" id="btn-mute"  aria-label="靜音" aria-pressed="false"><span aria-hidden="true">🔊</span></button>
       <button class="ctrl" id="btn-speed" aria-label="調整語速">1.0×</button>
+      <button class="ctrl" id="btn-lang" aria-label="切換對話語言">中</button>
+      <button class="ctrl" id="btn-history" aria-label="開啟聊天紀錄" aria-expanded="false"><span aria-hidden="true">☰</span></button>
       <button class="ctrl" id="btn-close" aria-label="收起助理"><span aria-hidden="true">✕</span></button>
       </div>
     </div>
@@ -202,6 +242,7 @@
 
   // ===== 兩種人格模式（data-mode）：assistant＝導覽助理（預設、原行為）；companion＝陪伴模式（記憶＋連續對話）=====
   const MODE = (CFG.get('mode') || '').toLowerCase() === 'companion' ? 'companion' : 'assistant';
+  let currentLocale = /^(zh-TW|en-US|ja-JP)$/i.test(CFG.get('lang') || '') ? CFG.get('lang') : 'zh-TW';
   // 記憶（陪伴模式限定）：只存訪客自己瀏覽器的 localStorage，零後端、不上傳；說「忘記我」即清除
   const MEM = {
     key: 'avatar-widget-mem',
@@ -284,10 +325,13 @@
   // 陪伴模式：換陪聊 system prompt ＋ 附上最近對話記憶（多輪），她就「記得」你剛剛/上次說過的話
   function buildLLMMessages(q) {
     const ctx = topK(q, 3).map(e => 'Q：' + e.q + '\nA：' + e.a).join('\n---\n');
-    const RAG = '優先依據【參考資料】回答；資料沒有的就用常識簡短回應，不確定就老實說不知道。\n\n【參考資料】\n' + (ctx || '（無）');
-    const sys = (MODE === 'companion')
+    const page = contextText();
+    const RAG = '優先依據【參考資料】與【目前頁面】回答；資料沒有的就用常識簡短回應，不確定就老實說不知道。\n\n【參考資料】\n' + (ctx || '（無）') + (page ? '\n\n【目前頁面】\n' + page : '');
+    const languageRule = currentLocale.toLowerCase() === 'en-us' ? 'Please answer in concise, natural English.'
+      : (currentLocale.toLowerCase() === 'ja-jp' ? '自然で簡潔な日本語で回答してください。' : '請使用自然、簡短的繁體中文回答。');
+    const sys = ((MODE === 'companion')
       ? '你是這個網站的陪伴型語音虛擬人，親切、口語、繁體中文、每次最多兩三句。你記得訪客先前的對話' + (MEM.data.name ? '，訪客叫「' + MEM.data.name + '」，可自然稱呼' : '') + '。' + RAG
-      : '你是「可嵌入任何網站的語音虛擬人元件」的示範助手。主題是教人「怎麼把這個元件裝到自己的網站、怎麼換成自己的角色、怎麼使用」。請用繁體中文、口語、最多兩三句話簡短回答。' + RAG;
+      : '你是「可嵌入任何網站的語音虛擬人元件」的示範助手。主題是教人「怎麼把這個元件裝到自己的網站、怎麼換成自己的角色、怎麼使用」。請口語、最多兩三句話簡短回答。' + RAG) + '\n' + languageRule;
     const msgs = [{ role: 'system', content: sys }];
     if (MEM.on) for (const h of MEM.data.history) msgs.push({ role: h.role, content: h.content });
     msgs.push({ role: 'user', content: q });
@@ -302,7 +346,7 @@
   let audioMouth = 0, useAudioMouth = false, audioCtx = null;
   let speakSeq = 0, currentSource = null, currentRaf = 0; // 控制「點第二下打斷第一下」
   let neuralDisabled = false; // 抓不到神經語音後端就鎖定瀏覽器語音，避免每句都打 404
-  const NEURAL_VOICE = CFG.get('voice') || 'zh-TW-HsiaoChenNeural'; // 微軟神經語音「曉臻」（可用 data-voice 覆蓋）
+  let neuralVoice = CFG.get('voice') || 'zh-TW-HsiaoChenNeural'; // 可用 data-voice 覆蓋；切換語言時會選相符聲線
   let recognition = null, listening = false;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let gesture3D = null; // 3D 手勢觸發 hook（bootVRM 設定；2D 模式為 null → 自動 no-op）
@@ -386,14 +430,169 @@
   function postToParent(type, payload) {
     try { window.parent.postMessage(Object.assign({ ns: 'avatar-widget', type }, payload || {}), PARENT_ORIGIN); } catch (e) {}
   }
+  var PAGE_CONTEXT = {};
+  var HOST_TOOLS = [];
+  var chatLog = [];
+  var chatSeq = 0;
+
+  function emitEvent(name, properties) {
+    postToParent('event', { name: String(name || '').slice(0, 80), properties: properties || {} });
+  }
+
+  function safeContext(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const out = {};
+    Object.keys(value).slice(0, 30).forEach((key) => {
+      const safeKey = String(key).slice(0, 60);
+      const v = value[key];
+      if (v == null || typeof v === 'boolean' || typeof v === 'number') out[safeKey] = v;
+      else if (typeof v === 'string') out[safeKey] = v.slice(0, 800);
+      else if (Array.isArray(v)) out[safeKey] = v.slice(0, 20).map((x) => String(x).slice(0, 160));
+    });
+    return out;
+  }
+
+  function contextText() {
+    const keys = Object.keys(PAGE_CONTEXT);
+    if (!keys.length) return '';
+    return keys.map((k) => k + '：' + (Array.isArray(PAGE_CONTEXT[k]) ? PAGE_CONTEXT[k].join('、') : String(PAGE_CONTEXT[k]))).join('\n');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    const box = document.createElement('textarea');
+    box.value = text; box.style.position = 'fixed'; box.style.opacity = '0';
+    document.body.appendChild(box); box.select();
+    try { document.execCommand('copy'); } finally { box.remove(); }
+    return Promise.resolve();
+  }
+
+  function addChatMessage(role, text, options) {
+    options = options || {};
+    const item = {
+      id: options.id || ('m' + (++chatSeq)), role: role === 'user' ? 'user' : 'assistant',
+      text: String(text || '').slice(0, 4000), streaming: !!options.streaming,
+      pendingTool: options.pendingTool || null
+    };
+    chatLog.push(item);
+    if (chatLog.length > 80) chatLog.shift();
+    renderHistory();
+    emitEvent('message', { role: item.role, source: options.source || 'conversation' });
+    return item.id;
+  }
+
+  function updateChatMessage(id, text, streaming) {
+    const item = chatLog.find((m) => m.id === id);
+    if (!item) return addChatMessage('assistant', text, { id, streaming });
+    item.text = String(text || '').slice(0, 4000); item.streaming = !!streaming;
+    renderHistory();
+    return item.id;
+  }
+
+  function setHistoryOpen(open) {
+    const panel = document.getElementById('history-panel');
+    const btn = document.getElementById('btn-history');
+    panel.classList.toggle('open', !!open); panel.setAttribute('aria-hidden', String(!open));
+    btn.setAttribute('aria-expanded', String(!!open));
+    document.getElementById('suggestions').style.display = open ? 'none' : (listening ? 'none' : 'flex');
+    if (open) { document.getElementById('bubble').classList.remove('show'); renderHistory(); }
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    list.replaceChildren();
+    if (!chatLog.length) {
+      const empty = document.createElement('div'); empty.className = 'history-empty';
+      empty.textContent = '還沒有對話。問我一個問題，紀錄會出現在這裡。'; list.appendChild(empty); return;
+    }
+    chatLog.forEach((item) => {
+      const row = document.createElement('div'); row.className = 'history-item ' + item.role;
+      const msg = document.createElement('div'); msg.className = 'history-message'; msg.textContent = item.text || (item.streaming ? '…' : ''); row.appendChild(msg);
+      if (item.pendingTool) {
+        const confirm = document.createElement('div'); confirm.className = 'history-confirm';
+        const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'confirm'; yes.textContent = '確認執行';
+        const no = document.createElement('button'); no.type = 'button'; no.className = 'cancel'; no.textContent = '取消';
+        yes.onclick = () => executePendingTool(item.id); no.onclick = () => cancelPendingTool(item.id);
+        confirm.append(yes, no); row.appendChild(confirm);
+      } else if (item.role === 'assistant' && item.text && !item.streaming) {
+        const tools = document.createElement('div'); tools.className = 'history-tools';
+        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'history-tool'; copy.textContent = '複製';
+        const replay = document.createElement('button'); replay.type = 'button'; replay.className = 'history-tool'; replay.textContent = '重播';
+        copy.onclick = () => copyText(item.text).then(() => showBubble('已複製回答'));
+        replay.onclick = () => { speak(item.text); emitEvent('replay', { messageId: item.id }); };
+        tools.append(copy, replay); row.appendChild(tools);
+      }
+      list.appendChild(row);
+    });
+    list.scrollTop = list.scrollHeight;
+  }
+
+  function normaliseTools(tools) {
+    if (!Array.isArray(tools)) return [];
+    return tools.slice(0, 20).map((tool) => ({
+      name: String(tool && tool.name || '').replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 64),
+      label: String(tool && tool.label || tool && tool.name || '').slice(0, 80),
+      description: String(tool && tool.description || '').slice(0, 240),
+      keywords: Array.isArray(tool && tool.keywords) ? tool.keywords.slice(0, 20).map((k) => String(k).toLowerCase().slice(0, 60)) : [],
+      requiresConfirmation: !tool || tool.requiresConfirmation !== false
+    })).filter((tool) => tool.name && tool.label);
+  }
+
+  function matchHostTool(text) {
+    const q = String(text || '').toLowerCase();
+    return HOST_TOOLS.find((tool) => tool.keywords.some((k) => k && q.includes(k))) || null;
+  }
+
+  function offerHostTool(tool, query) {
+    const callId = 'tool-' + Date.now() + '-' + (++chatSeq);
+    const pending = { callId, name: tool.name, label: tool.label, input: { query, context: PAGE_CONTEXT } };
+    if (tool.requiresConfirmation) {
+      addChatMessage('assistant', '要幫你執行「' + tool.label + '」嗎？', { id: callId, pendingTool: pending, source: 'tool' });
+      setHistoryOpen(true);
+    } else {
+      addChatMessage('assistant', '正在執行「' + tool.label + '」…', { id: callId, source: 'tool' });
+      postToParent('tool-call', pending);
+    }
+    emitEvent('tool_offer', { name: tool.name, confirmation: tool.requiresConfirmation });
+  }
+
+  function executePendingTool(messageId) {
+    const item = chatLog.find((m) => m.id === messageId);
+    if (!item || !item.pendingTool) return;
+    const pending = item.pendingTool; item.pendingTool = null; item.text = '正在執行「' + pending.label + '」…'; renderHistory();
+    postToParent('tool-call', pending); emitEvent('tool_confirm', { name: pending.name });
+  }
+
+  function cancelPendingTool(messageId) {
+    const item = chatLog.find((m) => m.id === messageId);
+    if (!item || !item.pendingTool) return;
+    const name = item.pendingTool.name; item.pendingTool = null; item.text = '好的，已取消。'; renderHistory();
+    emitEvent('tool_cancel', { name });
+  }
+
+  function handleToolResult(d) {
+    const text = d.ok === false ? ('執行失敗：' + String(d.error || '未知錯誤')) : String(d.message || '已完成。');
+    const existing = chatLog.find((m) => m.id === d.callId);
+    if (existing) updateChatMessage(existing.id, text, false); else addChatMessage('assistant', text, { source: 'tool' });
+    speak(text); emitEvent('tool_result', { name: d.name || '', ok: d.ok !== false });
+  }
+
   window.addEventListener('message', (e) => {
     if (e.source !== window.parent) return;
     if (PARENT_ORIGIN !== '*' && e.origin !== PARENT_ORIGIN) return;
     const d = e.data || {};
     if (d.ns !== 'avatar-widget-host') return;
-    if (d.type === 'say') speak(String(d.text || '').slice(0, 600));
+    if (d.type === 'say') {
+      const text = String(d.text || '').slice(0, 600); addChatMessage('assistant', text, { source: 'host' }); speak(text);
+    }
     if (d.type === 'ask') handleUser(String(d.text || '').slice(0, 200));   // 父頁代問（例：landing 點卡片 → 小修回答）
     if (d.type === 'visibility') setRendererVisible(d.visible !== false);
+    if (d.type === 'context') { PAGE_CONTEXT = safeContext(d.context); emitEvent('context_updated', { keys: Object.keys(PAGE_CONTEXT) }); }
+    if (d.type === 'tools') HOST_TOOLS = normaliseTools(d.tools);
+    if (d.type === 'tool-result') handleToolResult(d);
+    if (d.type === 'locale') setLocale(d.locale);
+    if (d.type === 'expression') setExternalExpression(d.name);
     // 注意：不接受用 postMessage 遠端啟動麥克風（listen），避免惡意父頁偷開麥；麥克風只由使用者點擊觸發
   });
 
@@ -405,11 +604,32 @@
   }
 
   // ===== TTS：開口說話 + 對嘴 =====
+  function localeLabel(locale) { return /^en/i.test(locale) ? 'EN' : (/^ja/i.test(locale) ? '日' : '中'); }
+  function localeVoice(locale) { return /^en/i.test(locale) ? 'en-US-JennyNeural' : (/^ja/i.test(locale) ? 'ja-JP-NanamiNeural' : 'zh-TW-HsiaoChenNeural'); }
+  function setLocale(locale) {
+    const normal = String(locale || '').replace('_', '-');
+    const matched = ['zh-TW', 'en-US', 'ja-JP'].find((x) => x.toLowerCase() === normal.toLowerCase());
+    if (!matched) return;
+    currentLocale = matched;
+    if (!CFG.get('voice')) neuralVoice = localeVoice(matched);
+    const btn = document.getElementById('btn-lang'); if (btn) btn.textContent = localeLabel(matched);
+    if (recognition) recognition.lang = matched;
+    loadVoice();
+    emitEvent('locale_change', { locale: matched });
+  }
+  function setExternalExpression(name) {
+    name = String(name || '').toLowerCase();
+    if (!/^(neutral|happy|sad|surprised|thinking)$/.test(name)) return;
+    if (name === 'thinking') { if (gesture3D) gesture3D('thinking'); }
+    else setEmotion(name);
+    emitEvent('expression_change', { name });
+  }
   function loadVoice() {
     const vs = speechSynthesis.getVoices();
     const pick = (re) => vs.find(v => re.test(v.name + ' ' + v.lang) && !/Google/i.test(v.name)); // 避開 Chrome 會靜默失敗的 Google 遠端語音
-    ttVoice =
-         pick(/(HsiaoChen|HsiaoYu|曉臻|曉雨).*zh/i)        // 微軟神經女聲（最自然，若有安裝）
+    const langPattern = new RegExp(currentLocale.replace('-', '[-_]'), 'i');
+    ttVoice = pick(langPattern)
+      || pick(/(HsiaoChen|HsiaoYu|曉臻|曉雨).*zh/i)        // 微軟神經女聲（最自然，若有安裝）
       || pick(/(Yating|Zhiwei).*zh[-_]TW/i)               // 較新、較不機械的微軟 zh-TW 女聲
       || pick(/Microsoft.*zh[-_]TW/i)                      // 任何微軟 zh-TW（本地、可靠）
       || pick(/zh[-_]TW/i)
@@ -511,7 +731,7 @@
       const resp = await fetch(TTS_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice: NEURAL_VOICE, text }),
+        body: JSON.stringify({ voice: neuralVoice, text }),
         signal: controller.signal,
       });
       if (!resp.ok) throw new Error('http ' + resp.status);
@@ -621,6 +841,12 @@
   function brain(qRaw) {
     const q = (qRaw || '').trim();
     if (!q) return '我好像沒聽清楚，可以再說一次嗎？';
+    const lower = q.toLowerCase();
+    const contextKeys = Object.keys(PAGE_CONTEXT);
+    const matchedContext = contextKeys.find((key) => lower.includes(key.toLowerCase()));
+    if (matchedContext) return matchedContext + '是「' + String(PAGE_CONTEXT[matchedContext]) + '」。';
+    if (/這頁|目前頁面|現在頁面|page title|頁面標題/.test(lower) && PAGE_CONTEXT.title) return '你目前在「' + PAGE_CONTEXT.title + '」這個頁面。';
+    if (/網址|連結|url/.test(lower) && PAGE_CONTEXT.url) return '目前頁面的網址是 ' + PAGE_CONTEXT.url;
     const site = bestOf(window.KB, q);
     if (MODE === 'companion') {                          // 陪伴模式：聊天題給陪聊腦、網站/產品題照答
       const chat = bestOf(COMPANION_KB, q);
@@ -633,7 +859,7 @@
     return '你問的是「' + q + '」對吧？這題我的知識庫還沒收錄～你可以問我「怎麼安裝」「怎麼換成我的角色」「要不要錢」「麥克風怎麼用」這些喔。';
   }
   // 有大腦時生成更自然的回答；WebLLM 走串流「邊生成邊講」，Ollama／檢索為整段後逐句講
-  function sayAnswer(t) { MEM.addTurn('assistant', t); speak(t); }   // 回答統一走這：陪伴模式順手寫進記憶
+  function sayAnswer(t) { MEM.addTurn('assistant', t); addChatMessage('assistant', t); speak(t); }   // 回答統一走這：陪伴模式順手寫進記憶
   async function respond(q, requestId) {
     q = (q || '').trim();
     if (!q) { speak('我好像沒聽清楚，可以再說一次嗎？'); return; }
@@ -657,9 +883,11 @@
         showBubble('讓我想想…'); if (gesture3D) gesture3D('thinking');
         const sid = ttsMuted ? 0 : beginSpeech();       // 靜音時只更新字幕、不進語音佇列
         const st = { buf: '' };
+        const streamMessageId = 'stream-' + requestId;
         const out = await window.LLM.chat(buildLLMMessages(q), (delta, sofar) => {
           if (requestId !== _responseSeq) return;
           showBubble(sofar);                            // 邊生成邊更新字幕
+          updateChatMessage(streamMessageId, sofar, true);
           if (sid) {
             if (sid !== speakSeq) return;               // 中途被打斷 → 剩下的只當字幕
             setEmotionFromText(sofar);
@@ -670,6 +898,7 @@
         if (requestId !== _responseSeq) return;
         if (out && out.trim()) {
           MEM.addTurn('assistant', out.trim());
+          updateChatMessage(streamMessageId, out.trim(), false);
           if (sid && sid === speakSeq) { for (const s of drainSentences(st, true)) pushSpeech(sid, s); endSpeech(sid); }
           else if (!sid) onUtteranceEnd();              // 靜音：沒有語音收尾 → 手動觸發對話迴圈 hook
           postToParent('speaking', { text: out.trim() });
@@ -685,6 +914,7 @@
 
   function handleUser(text) {
     if (text) showBubble('你：' + text);
+    if (text) addChatMessage('user', text);
     const requestId = ++_responseSeq;
     if (_brainController) { try { _brainController.abort(); } catch (e) {} }
     _brainController = new AbortController();
@@ -693,6 +923,8 @@
       MEM.captureName(text);
       MEM.addTurn('user', text);
     }
+    const matchedTool = matchHostTool(text);
+    if (matchedTool) { handleUser._busy = false; offerHostTool(matchedTool, text); return; }
     handleUser._busy = true;                            // 回答完成前不要自動重開麥（onUtteranceEnd 會清）
     respond(text, requestId);
   }
@@ -714,7 +946,7 @@
     if (!SR) { speak('你的瀏覽器不支援語音辨識，建議用 Chrome 開喔。'); convoOn = false; return; }
     if (listening && recognition) { recognition.stop(); return; }
     try { recognition = new SR(); } catch (e) { speak('語音辨識啟動失敗：' + e.message); convoOn = false; return; }
-    recognition.lang = 'zh-TW'; recognition.interimResults = true;
+    recognition.lang = currentLocale; recognition.interimResults = true;
     recognition.continuous = false; recognition.maxAlternatives = 1;
     recognition.onstart  = () => { listening = true; setMic(true); showBubble(convoOn ? '聊吧，我在聽 🎙️（再點一下按鈕結束）' : '聆聽中…請說話 🎙️'); };
     recognition.onresult = (e) => {
@@ -1100,6 +1332,17 @@
 
   // ===== 控制列 =====
   document.getElementById('btn-close').onclick = () => postToParent('close');
+  document.getElementById('btn-history').onclick = () => setHistoryOpen(!document.getElementById('history-panel').classList.contains('open'));
+  document.getElementById('btn-history-close').onclick = () => setHistoryOpen(false);
+  document.getElementById('btn-history-clear').onclick = () => {
+    chatLog.length = 0; renderHistory(); showBubble('已清除這次的聊天紀錄'); emitEvent('history_clear');
+  };
+  document.getElementById('btn-lang').onclick = () => {
+    const locales = ['zh-TW', 'en-US', 'ja-JP'];
+    setLocale(locales[(locales.indexOf(currentLocale) + 1) % locales.length]);
+    showBubble(currentLocale === 'en-US' ? 'Language: English' : (currentLocale === 'ja-JP' ? '言語：日本語' : '語言：繁體中文'));
+  };
+  setLocale(currentLocale);
 
   // 範例提示清單：一進站就告訴使用者「可以說什麼」，點任一項＝直接問（語音/打字都不用先猜）
   (function renderSuggestions() {

@@ -23,6 +23,11 @@
 - **語音輸入（STT）**：瀏覽器內建語音辨識；也可**直接打字**（Enter／➤ 送出，IME 組字不誤送），回答一樣走語音＋對嘴
 - **語音輸出（TTS）**：神經語音（自然女聲），失敗自動退回瀏覽器內建語音
 - **大腦**：知識庫檢索（即時、零金鑰）＋可選的瀏覽器內 LLM（WebLLM，零金鑰）
+- **聊天紀錄**：本次開啟期間可回看問答、複製回答、重播語音或一鍵清除（不會自動上傳／永久保存）
+- **懂目前頁面**：宿主可用 `setContext()` 傳入商品、方案或會員狀態，回答時會連同知識庫一起參考
+- **安全網站操作**：宿主可註冊 `registerTool()`；虛擬人辨識關鍵字後先請使用者確認，再於父頁執行操作
+- **匿名事件介面**：用 `on()` 接收訊息、工具確認／結果等事件，方便串接自己的分析服務
+- **多語音與表情 API**：可切換繁中／英文／日文的辨識與聲線，並由網站觸發角色情緒
 - **一行嵌入**：`embed.js` 動態建立 iframe widget，不干擾宿主網站
 
 ## 🧱 架構
@@ -34,6 +39,7 @@
 | `embed.js` | 一行嵌入載入器（建 iframe ＋ `postMessage` 父子溝通 ＋ 對外 `window.AvatarWidget` API） |
 | `knowledge.js` | 知識庫（FAQ 範例內容，可自行替換） |
 | `demo-host.html` | 模擬「客戶網站」的示範頁 |
+| `admin.html` | 本機知識庫編輯器：匯入、驗證、預覽並匯出 JSON（不自動上傳） |
 | `api/tts.js` | Vercel serverless function：取得神經語音 MP3 |
 | `m1-standalone.html` | 早期里程碑的單檔版（純參考，可刪） |
 
@@ -107,14 +113,54 @@ vercel --prod          # 本機開發：vercel dev
 | `data-vrm` | **皮（3D）**：VRM `.vrm` 網址；設了就改走 3D（three-vrm）引擎，可拖放／換成自製 VRoid 角色 | 無（不設＝走 2D Live2D） |
 | `data-engine` | 預設引擎 `2d`／`3d`；**同時給 `data-model` ＋ `data-vrm` 時，widget 會長出 2D/3D 即時切換鈕** | 有 2D 皮→`2d`，否則 `3d` |
 | `data-mode` | **人格**：`assistant` 導覽助理／`companion` **陪伴模式**（💬 一鍵連續對話＋本機記憶） | `assistant` |
+| `data-lang` | 對話語言 `zh-TW`／`en-US`／`ja-JP`（也可在元件內切換） | `zh-TW` |
 | `data-knowledge` | **內容**：知識庫 JSON 網址（陣列 `[{q,kw,a}]`） | 內建 `knowledge.js` |
 | `data-api` | **肉**：神經語音後端端點；不設＝純瀏覽器語音 | 試同站 `api/tts` |
 | `data-voice` | 神經語音聲線（需後端支援） | `zh-TW-HsiaoChenNeural` |
 | `data-widget` | `widget.html` 的網址 | 跟 `embed.js` 同目錄 |
-| `data-open` | 是否一進站就展開（`false`＝先收成泡泡） | `true` |
+| `data-open` | 是否一進站就展開（`false`＝先收成泡泡） | 桌機展開、手機收合 |
 
-對外 JS API：`window.AvatarWidget.open() / close() / say(text) / ask(text)`。
+對外 JS API：`window.AvatarWidget.open() / close() / say(text) / ask(text) / setContext(context) / setLocale(locale) / setExpression(name) / registerTool(definition) / unregisterTool(name) / setHandoff(options) / on(name, handler) / off(name, handler)`。
 （`say`＝直接唸出這段字；`ask`＝幫使用者問一個問題、會跑檢索／大腦回答，例如 landing 頁點卡片就讓虛擬人開口回答。）
+
+頁面情境與網站工具範例：
+
+```html
+<script>
+  AvatarWidget.setContext({
+    title: document.title,
+    product: '專業方案',
+    price: 'NT$990／月',
+    signedIn: true
+  });
+
+  AvatarWidget.registerTool({
+    name: 'open_checkout',
+    label: '前往結帳',
+    description: '開啟目前商品的結帳頁',
+    keywords: ['結帳', '購買', '我要買'],
+    requiresConfirmation: true,
+    execute: function () {
+      location.href = '/checkout';
+      return '已為你開啟結帳頁。';
+    }
+  });
+
+  AvatarWidget.on('tool_result', function (event) {
+    // 在這裡串接你自己的匿名分析服務
+    console.log(event);
+  });
+
+  AvatarWidget.setHandoff({
+    label: '轉接 LINE 客服',
+    url: 'https://line.me/R/ti/p/@YOUR_ACCOUNT'
+  });
+</script>
+```
+
+`setContext()` 只接受簡單字串／數字／布林／字串陣列，並限制欄位數與長度；請勿放密碼、權杖、完整信用卡或其他敏感資料。網站工具的 `execute` 函式只留在父頁，不會傳進 iframe。
+
+知識庫可開啟 `admin.html` 編輯。這個靜態工具刻意不假裝成雲端資料庫：它會驗證與匯出 JSON，但不會把產品資料存在 `localStorage` 或 Vercel Function 的暫存檔案系統。若要多人共用、登入、版本紀錄與永久儲存，需再接正式資料庫與身分驗證。
 
 **內容白標（`window.KB_META`）**：在你的 `knowledge.js` 裡設 `window.KB_META = { name, welcome, greeting, sgLabel, suggestions:[…], fallback }`，就能讓「開場白／打招呼／提示鈕／答不出來的兜底」全跟著你的領域走——同一顆引擎可當客服／居家修繕／導覽…（不設＝用預設）。
 
