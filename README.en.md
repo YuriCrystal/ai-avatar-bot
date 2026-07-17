@@ -220,7 +220,7 @@ This project's own code is **MIT** (see `LICENSE`). It **depends on** the follow
 |---|---|
 | **Live2D Cubism Core** (CDN `cubism.live2d.com`) | **Proprietary** (Live2D Proprietary Software License). Not open source; check Live2D's terms for commercial use / redistribution. |
 | **Haru sample model** (CDN, pixi-live2d-display test asset) | Live2D **Free Material License**, **demo only**. Replace with your own properly licensed model in production. This repo doesn't bundle model files; they're CDN-referenced. |
-| **“Mu (free edition)” Live2D skin** (local demo only) | Obtained/purchased by the project owner from **bilibili Workshop**. It is not covered by this project's MIT license. Copyright, commercial use, modification, and redistribution follow the author's product terms. The model stays under the Git-ignored `models/` directory. |
+| **“Mu (free edition)” Live2D skin** (hosted and local demos) | Obtained/purchased by the project owner from **bilibili Workshop**. It is loaded from a separate static asset deployment and is not committed to this repo; `models/` remains Git-ignored. Browser-readable access does not grant modification, commercial-use, or redistribution rights. The author's product terms still apply. |
 | **pixi.js / pixi-live2d-display** | MIT |
 | **three.js / @pixiv/three-vrm** | MIT |
 | **@mlc-ai/web-llm** (WebLLM) | Apache-2.0; downloaded model weights carry their own licenses (Qwen2.5 under its own terms) |

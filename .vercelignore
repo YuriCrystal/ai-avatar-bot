@@ -1,0 +1,3 @@
+# Proprietary / locally licensed character assets are deployed from a separate
+# asset-only Vercel project and must never be bundled with the open-source app.
+models/

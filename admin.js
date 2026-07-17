@@ -221,7 +221,7 @@
     var site = { id:'demo-store', name:'示範品牌官網', primary_origin:'https://example.com', status:'active', public_key_hint:'review', role:'owner' };
     var config = {
       name:'木｜網站助理', mode:'assistant', locale:'zh-TW', engine:'2d', fit:'half',
-      model2d:'/models/mu_bilibili/mu.model3.json', model3d:'', voice:'zh-TW-YunJheNeural',
+      model2d:'https://ai-avatar-mu-assets.vercel.app/mu.model3.json', model3d:'', voice:'zh-TW-YunJheNeural',
       welcome:'嗨，我是木，有產品、方案或預約問題都可以問我。', greeting:'你好，我是木，需要我幫你找產品資訊嗎？',
       fallback:'這題我還需要確認，你可以換個方式問，或轉接真人客服。', suggestions:['有哪些方案？','如何預約？','可以轉真人客服嗎？'], brandColor:'#5b54e8', width:340, height:480
     };

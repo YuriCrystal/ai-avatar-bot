@@ -12,7 +12,7 @@
 
 ![Demo：landing 頁右下角的 Live2D 語音虛擬人](docs/demo-landing.jpg)
 
-> 本機 DEMO 目前使用 Live2D V 皮「木（免費版）」，由專案持有人自 **bilibili 工房取得／購買**。V 皮素材不包含在本專案程式碼的 MIT 授權內，使用、修改、商用與再散布須遵循原作者及商品頁條款。
+> 線上／本機 DEMO 目前使用 Live2D V 皮「木（免費版）」，由專案持有人自 **bilibili 工房取得／購買**。模型由獨立的 Vercel 靜態資產站提供，沒有提交到此 GitHub repo，也不包含在本專案程式碼的 MIT 授權內。瀏覽器為了顯示角色仍需公開讀取資產網址；這不代表訪客取得修改、商用或再散布授權，實際權利依原作者及商品頁條款為準。
 
 ## 🧭 營運管理後台
 
@@ -306,7 +306,7 @@ vercel --prod          # 本機開發：vercel dev
 |---|---|
 | **Live2D Cubism Core**（CDN `cubism.live2d.com`） | **專有授權**（Live2D Proprietary Software License）。非開源，商用/再散佈須自行確認 Live2D 條款。 |
 | **Haru 範例模型**（CDN，pixi-live2d-display 測試資產） | Live2D **Free Material License**，**僅供範例**。正式上線請換成你自有合法授權的模型。本 repo 不夾帶模型檔，採 CDN 引用。 |
-| **「木（免費版）」Live2D V 皮**（本機 DEMO） | 由專案持有人自 **bilibili 工房取得／購買**；不屬於本專案 MIT 授權。著作權、商用、修改與再散布限制以原作者及商品頁條款為準。模型放在被 Git 忽略的 `models/`，不會隨程式碼公開提交。 |
+| **「木（免費版）」Live2D V 皮**（線上／本機 DEMO） | 由專案持有人自 **bilibili 工房取得／購買**；不屬於本專案 MIT 授權。模型由獨立靜態資產站載入，本 repo 的 `models/` 仍被 Git 忽略。瀏覽器可讀取不等於獲得修改、商用或再散布權，實際限制以原作者及商品頁條款為準。 |
 | **pixi.js / pixi-live2d-display** | MIT |
 | **three.js / @pixiv/three-vrm** | MIT |
 | **@mlc-ai/web-llm**（WebLLM） | Apache-2.0；下載的模型權重各有授權（Qwen2.5 為其自身條款） |
