@@ -22,6 +22,8 @@
     width:28px; height:28px; border-radius:50%; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; }
   .pill { display:inline-block; background:#eef2f6; border-radius:999px; padding:3px 10px; font-size:13px; color:#456; margin:2px 3px; }
   .note { font-size:13px; color:#6a7b8b; line-height:1.7; }
+  .credit { border-left:4px solid #8c78e8; background:#f5f2ff; }
+  .credit strong { color:#43378f; }
   kbd { background:#f1f4f7; border:1px solid #dde3e9; border-radius:5px; padding:1px 7px; font-size:13px; }
   a { color:#2f6d8f; }
 </style>
@@ -29,31 +31,37 @@
 <body>
   <header>
     <h1>🗣️ AI 虛擬人 · Demo</h1>
-    <p>網頁右下角會出現一位語音 AI 助理 —— 你可以「跟她說話」，她會聽懂、回答、開口說話並對嘴。<br/>大腦（LLM／檢索）在你的瀏覽器本機運行；語音輸入會經瀏覽器雲端辨識、語音合成經一支輕量 proxy。零金鑰。</p>
+    <p>網頁右下角會出現一位語音 AI 助理 —— 你可以「跟他說話」，他會聽懂、回答、開口說話並對嘴。<br/>大腦（LLM／檢索）在你的瀏覽器本機運行；語音輸入會經瀏覽器雲端辨識、語音合成經一支輕量 proxy。零金鑰。</p>
   </header>
 
   <div class="wrap">
-    <div class="card">
+    <div class="card" id="quick-start">
       <h2>怎麼玩（請用 Chrome 開啟）</h2>
       <ol class="steps">
-        <li>看右下角那位虛擬人 —— 點她一下，她會打招呼、開口說話。</li>
-        <li>點 <b>🎤 說話</b> → 准許麥克風 → 直接問她；不方便開麥也可以<b>直接打字</b>，例如「<b>怎麼裝到我的網站</b>」「<b>怎麼換成我的角色</b>」。</li>
-        <li>想讓她更聰明、能自然閒聊：點 <b>🧠</b> 啟用「AI 大腦」（首次會下載約 1GB 模型，之後就快了）。</li>
+        <li>看右下角那位虛擬人 —— 點他一下，他會打招呼、開口說話。</li>
+        <li>點 <b>🎙️ 即時</b> → 允許麥克風 → 直接連續對話；他回答時也能插話打斷。不方便開麥仍可<b>直接打字</b>，例如「<b>怎麼裝到我的網站</b>」「<b>怎麼換成我的角色</b>」。</li>
+        <li>想讓他更聰明、能自然閒聊：點 <b>🧠</b> 啟用「AI 大腦」（首次會下載約 1GB 模型，之後就快了）。</li>
       </ol>
     </div>
 
     <div class="card">
       <h2>這是什麼</h2>
-      <p class="note">一個可以<b>一行嵌進任何網站</b>、右下角的語音 AI 虛擬人元件。她會聽你說話、回答、開口講話還會對嘴 —— 大腦和語音都在你的瀏覽器裡跑。技術組成：</p>
+      <p class="note">一個可以<b>一行嵌進任何網站</b>、右下角的語音 AI 虛擬人元件。他會聽你說話、回答、開口講話還會對嘴 —— 大腦和語音都在你的瀏覽器裡跑。技術組成：</p>
       <p>
         <span class="pill">Live2D 動畫角色</span>
         <span class="pill">瀏覽器語音 STT / TTS</span>
+        <span class="pill">插話打斷 + 音量偵測</span>
         <span class="pill">即時對嘴</span>
         <span class="pill">知識庫檢索</span>
         <span class="pill">WebLLM 本機大腦</span>
         <span class="pill">一行 &lt;script&gt; 可嵌入任何網站</span>
       </p>
-      <p class="note">這隻角色只是<b>暫用的免費佔位模型</b>，用來示範引擎。沒有「官方正式版」—— 要上線就<b>自己準備角色</b>（做一個 Live2D 模型、用 <code>data-model</code> 指上去就換好了），皮是你自己造的。</p>
+      <p class="note">目前本機 DEMO 已導入 Live2D V 皮「木（免費版）」；手機會自動載入輕量材質版本，若本機未安裝此模型則改用公開範例角色。</p>
+    </div>
+
+    <div class="card credit" aria-labelledby="avatar-credit-title">
+      <h2 id="avatar-credit-title">V 皮來源聲明</h2>
+      <p class="note"><strong>本 DEMO 使用的 Live2D V 皮「木（免費版）」由專案持有人自 bilibili 工房取得／購買。</strong>角色著作權與使用授權依原作者及 bilibili 工房商品頁條款為準；V 皮素材不包含在本專案程式碼的 MIT 授權內。</p>
     </div>
 
     <div class="card">
@@ -66,11 +74,37 @@
     </div>
 
     <div class="card" style="border-left:4px solid #2f6d8f; background:#eef6fb;">
-      <p class="note" style="margin:0;">💡 這隻虛擬人的「腦袋」裝的就是<b>它自己的使用教學</b> —— 直接問她「怎麼安裝」「怎麼換角色」，她會回答你。換成自己的內容可改 <code>knowledge.js</code>、設 <code>data-knowledge</code>，或使用<a href="admin.html">知識庫編輯器</a>驗證並匯出 JSON。</p>
+      <p class="note" style="margin:0;">💡 這隻虛擬人的「腦袋」裝的就是<b>它自己的使用教學</b> —— 直接問他「怎麼安裝」「怎麼換角色」，他會回答你。登入<a href="admin.html">知識庫管理後台</a>即可儲存草稿、發布新版或復原舊版本。</p>
     </div>
   </div>
 
   <!-- ★ 一行嵌入虛擬人 ★ -->
-  <script src="embed.js?v=1.2.0" data-widget="widget.html"></script>
+  <script src="embed.js?v=1.2.10" data-widget="widget.html?v=1.2.10" data-model="/models/mu_bilibili/mu.model3.json" data-model-mobile="/models/mu_bilibili/mu.mobile.model3.json" data-fallback-model="https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display@31317b37d5e22955a44d5b11f37f421e94a11269/test/assets/haru/haru_greeter_t03.model3.json" data-engine="2d" data-fit="half" data-zoom="2.35" data-look="false" data-name="木" data-voice="zh-TW-YunJheNeural" data-welcome="嗨，我是木。點擊我或直接輸入問題，我可以帶你了解這個虛擬人元件。" data-greeting="你好，我是木。想了解怎麼安裝、換角色或使用語音功能，都可以直接問我。" data-config="/api/avatar-config?site=default" data-knowledge="/api/knowledge?site=default" data-analytics="/api/events?site=default" data-handoff="/api/handoff?site=default" data-leads="/api/leads?site=default"></script>
+  <script>
+    AvatarWidget.registerTool({
+      name:'show_quick_start', label:'查看快速開始', description:'捲動到本頁的操作教學與快速開始區塊',
+      keywords:['怎麼玩', '快速開始', '操作教學'], examples:['帶我看怎麼開始', '顯示操作方式'],
+      requiresConfirmation:false, priority:2,
+      execute:function () {
+        document.getElementById('quick-start').scrollIntoView({ behavior:'smooth', block:'center' });
+        return '已帶你到快速開始。';
+      }
+    });
+    AvatarWidget.registerTool({
+      name:'change_demo_color', label:'更換示範頁顏色', description:'把示範頁背景更換成指定顏色',
+      keywords:['換顏色', '背景顏色', '頁面顏色'], examples:['把背景換成藍色', '我想改成綠色'],
+      excludeKeywords:['角色顏色'], requiresConfirmation:true,
+      inputSchema:{
+        type:'object',
+        properties:{ color:{ type:'string', title:'背景顏色', enum:['藍色','紫色','綠色'], prefixes:['顏色','換成','改成'] } },
+        required:['color']
+      },
+      execute:function (input) {
+        var colors = { '藍色':'#eef6fb', '紫色':'#f3f0ff', '綠色':'#eef9f2' };
+        document.body.style.background = colors[input.args.color];
+        return '已把示範頁背景換成' + input.args.color + '。';
+      }
+    });
+  </script>
 </body>
 </html>

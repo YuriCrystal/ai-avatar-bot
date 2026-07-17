@@ -3,7 +3,7 @@
 [繁體中文](README.md) | **English**
 
 > A bottom-right-corner voice AI avatar you can embed into **any website with one `<script>` line**.
-> Talk to her — she listens, answers, speaks out loud, and lip-syncs in real time.
+> Talk to the avatar — the character listens, answers, speaks out loud, and lip-syncs in real time.
 >
 > Designed as "**engine (the body) + swappable skin (character model) + content (knowledge base)**": the core is generic; swap the character and content via `data-*` attributes.
 > **Pure front-end by default — no backend, no external domains required** (voice uses the browser's built-in engines; an optional serverless function upgrades you to neural voice).
@@ -12,16 +12,22 @@
 
 ![Demo: Live2D voice avatar in the bottom-right corner of a landing page](docs/demo-landing.jpg)
 
+## 🧭 Operations dashboard
+
+![AI avatar operations dashboard with conversation analytics, human support, leads, avatar status, and knowledge-base status](docs/admin-dashboard.png)
+
+Manage avatar settings, versioned knowledge, anonymous analytics, human-support cases, leads and bookings, installation snippets, and member permissions from one workspace. Open `admin.html?preview=1` for read-only sample data; production mode uses Clerk authentication and Neon Postgres persistence.
+
 ---
 
 ## ✨ Features
 
 - **Live2D animated character** with real-time **lip-sync** (mouth driven by actual audio volume)
-- **Sentence-by-sentence speech**: long answers are chunked — she starts speaking the first sentence while prefetching the next; with the 🧠 in-browser LLM she **speaks while still generating**
-- **Emotion expressions (3D)**: her face follows the answer (happy / surprised / sorry), easing back to neutral after speaking
-- **Two personality modes**: default "guide assistant"; `data-mode="companion"` turns her into a **companion** = continuous conversation (auto-listens again after she finishes) + memory (remembers your name and past chat; stored only in the visitor's browser, say "忘記我" / "forget me" to wipe)
+- **Sentence-by-sentence speech**: long answers are chunked — the avatar starts speaking the first sentence while prefetching the next; with the 🧠 in-browser LLM it **speaks while still generating**
+- **Emotion expressions (3D)**: the character's face follows the answer (happy / surprised / sorry), easing back to neutral after speaking
+- **Two personality modes**: default "guide assistant"; `data-mode="companion"` enables a **companion** experience with continuous conversation and local memory (stored only in the visitor's browser; say "忘記我" / "forget me" to wipe)
 - **Voice input (STT)**: browser built-in speech recognition; or just **type** (Enter / ➤ to send, IME-composition safe) — answers still come back as voice + lip-sync
-- **Voice output (TTS)**: neural voice (natural female voice), auto-fallback to the browser's built-in voice
+- **Voice output (TTS)**: selectable male or female neural voices, with automatic same-language browser fallback
 - **Brain**: knowledge-base retrieval (instant, zero API keys) + optional in-browser LLM (WebLLM, zero API keys)
 - **One-line embed**: `embed.js` creates an iframe widget without touching the host site
 
@@ -104,6 +110,9 @@ Drag your `.vrm` file **onto the avatar** — it instantly becomes your 3D chara
 | Attribute | What it does | Default |
 |---|---|---|
 | `data-model` | **Skin (2D)**: Live2D `.model3.json` URL | Built-in Haru sample |
+| `data-model-mobile` | **Lightweight mobile skin (2D)**: replaces `data-model` on narrow screens or data-saver connections | unset |
+| `data-fallback-model` | **Fallback skin (2D)**: loaded automatically when the custom model fails | public Haru sample |
+| `data-look` | **Optional pointer gaze**: `true` follows the pointer; set `false` to keep the avatar's gaze independent | `true` |
 | `data-vrm` | **Skin (3D)**: VRM `.vrm` URL; setting it switches to the 3D (three-vrm) engine; supports drag & drop / your own VRoid character | none (unset = 2D Live2D) |
 | `data-engine` | Default engine `2d` / `3d`; **give both `data-model` + `data-vrm` and the widget grows a live 2D/3D toggle** | `2d` if a 2D skin exists, else `3d` |
 | `data-mode` | **Personality**: `assistant` guide / `companion` (💬 one-tap continuous conversation + local memory) | `assistant` |
@@ -112,6 +121,8 @@ Drag your `.vrm` file **onto the avatar** — it instantly becomes your 3D chara
 | `data-voice` | Neural voice name (backend must support it) | `zh-TW-HsiaoChenNeural` |
 | `data-widget` | URL of `widget.html` | same directory as `embed.js` |
 | `data-open` | Start expanded (`false` = collapsed bubble) | `true` |
+
+Pointer gaze remains available to open-source users by default. Add `data-look="false"` to the embed tag when you prefer not to use it.
 
 Public JS API: `window.AvatarWidget.open() / close() / say(text) / ask(text)`.
 (`say` = speak this text verbatim; `ask` = ask a question on the user's behalf — runs retrieval/LLM and answers, e.g. a landing-page card click makes the avatar answer out loud.)

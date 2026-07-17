@@ -3,7 +3,16 @@
   "version": "1.2.0",
   "private": true,
   "description": "Web 右下角 Live2D 語音 AI 虛擬人 demo",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "node tests/tool-router.test.js && node tests/avatar-config.test.js && node tests/lead-store.test.js && node tests/site-auth.test.js && node tests/security.test.js && node tests/tenant-contract.test.js && node tests/handoff-api.test.js && node tests/admin-dashboard.test.js && node tests/model-resilience.test.js"
+  },
   "dependencies": {
+    "@clerk/backend": "^3.11.6",
+    "@neondatabase/serverless": "^1.1.0",
+    "cheerio": "^1.2.0",
     "msedge-tts": "^2.0.7"
   }
 }

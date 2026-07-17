@@ -32,20 +32,61 @@
   var widgetUrl = (me && me.getAttribute('data-widget')) || (base + 'widget.html');
   var openAttr = me && me.getAttribute('data-open');
   var narrowScreen = !!(window.matchMedia && window.matchMedia('(max-width:640px)').matches);
+  var saveData = !!(navigator.connection && navigator.connection.saveData);
   // 桌機預設展開；手機預設收合，仍可用 data-open="true|false" 明確覆蓋。
   var startOpen = openAttr === 'true' || (openAttr !== 'false' && !narrowScreen);
   var widgetOrigin = (function () { try { return new URL(widgetUrl, location.href).origin; } catch (e) { return '*'; } })();
 
   // 把可設定項帶進 widget：皮=model / 肉的語音後端=api / 內容=knowledge / 聲線=voice
   var cfg = new URLSearchParams();
-  ['model', 'vrm', 'api', 'knowledge', 'voice', 'ollama', 'llmmodel', 'fit', 'mode', 'engine', 'lang'].forEach(function (k) {
+  var explicitCfg = Object.create(null);
+  ['model', 'vrm', 'api', 'knowledge', 'analytics', 'handoff', 'voice', 'ollama', 'llmmodel', 'fit', 'zoom', 'look', 'mode', 'engine', 'lang', 'brand', 'name', 'welcome', 'greeting', 'fallback', 'suggestions', 'site', 'sitekey'].forEach(function (k) {
     var v = me && me.getAttribute('data-' + k);
-    if (v) cfg.set(k, v);
+    if (v) { cfg.set(k, v); explicitCfg[k] = true; }
   });
-  var cfgQs = cfg.toString();
-  var iframeSrc = widgetUrl + (cfgQs ? (widgetUrl.indexOf('?') < 0 ? '?' : '&') + cfgQs : '');
+  // 可另外提供輕量 2D 模型；手機窄螢幕或開啟省流量模式時自動使用。
+  var mobileModel = me && me.getAttribute('data-model-mobile');
+  if (mobileModel && (narrowScreen || saveData)) {
+    cfg.set('model', mobileModel);
+    explicitCfg.model = true;
+  }
+  // 自訂模型不存在或載入失敗時，切換到合法的公開範例角色。
+  var fallbackModel = me && me.getAttribute('data-fallback-model');
+  if (fallbackModel) {
+    cfg.set('fallbackmodel', fallbackModel);
+    explicitCfg.fallbackmodel = true;
+  }
+  // 公開文件使用 data-site-key；保留舊 data-sitekey 僅供向下相容。
+  var documentedSiteKey = me && me.getAttribute('data-site-key');
+  if (documentedSiteKey) { cfg.set('sitekey', documentedSiteKey); explicitCfg.sitekey = true; }
+  var configAttr = me && me.getAttribute('data-config');
+  function endpointSite(value) {
+    try {
+      var site = new URL(value, new URL(widgetUrl, location.href)).searchParams.get('site') || '';
+      return /^[a-z0-9][a-z0-9_-]{0,39}$/i.test(site) ? site.toLowerCase() : '';
+    } catch (e) { return ''; }
+  }
+  if (!cfg.get('site')) {
+    [configAttr, cfg.get('knowledge'), cfg.get('analytics'), cfg.get('handoff'), me && me.getAttribute('data-leads')].some(function (value) {
+      var site = value && endpointSite(value);
+      if (!site) return false;
+      cfg.set('site', site);
+      return true;
+    });
+  }
+
+  function iframeSrc() {
+    var cfgQs = cfg.toString();
+    return widgetUrl + (cfgQs ? (widgetUrl.indexOf('?') < 0 ? '?' : '&') + cfgQs : '');
+  }
 
   var EXPANDED = { w: 340, h: 480 };
+  var widthAttr = me && me.getAttribute('data-width');
+  var heightAttr = me && me.getAttribute('data-height');
+  var explicitWidth = widthAttr ? Number(widthAttr) : NaN;
+  var explicitHeight = heightAttr ? Number(heightAttr) : NaN;
+  if (Number.isFinite(explicitWidth)) EXPANDED.w = Math.max(280, Math.min(Math.round(explicitWidth), 480));
+  if (Number.isFinite(explicitHeight)) EXPANDED.h = Math.max(380, Math.min(Math.round(explicitHeight), 720));
   var NS_OUT = 'avatar-widget-host'; // 父 → 子
   var NS_IN  = 'avatar-widget';      // 子 → 父
 
@@ -67,6 +108,7 @@
   var widgetReady = false;
   var pendingMessages = [];
   var toolRegistry = Object.create(null);
+  var toolExecutions = Object.create(null);
   var eventListeners = Object.create(null);
 
   function safeContext(value) {
@@ -88,10 +130,62 @@
     description: (document.querySelector('meta[name="description"]') || {}).content || ''
   });
 
+  function safeToolSchema(schema) {
+    if (!schema || schema.type !== 'object' || !schema.properties || typeof schema.properties !== 'object') return { type:'object', properties:{}, required:[] };
+    var properties = {};
+    Object.keys(schema.properties).slice(0, 20).forEach(function (name) {
+      if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(name)) return;
+      var raw = schema.properties[name] || {};
+      var property = {
+        type:/^(string|number|integer|boolean)$/.test(raw.type) ? raw.type : 'string',
+        title:String(raw.title || name).slice(0, 80), description:String(raw.description || '').slice(0, 160),
+        contextKey:String(raw.contextKey || '').slice(0, 60), format:/^(email|url|phone|contact)$/.test(raw.format) ? raw.format : '',
+        prefixes:Array.isArray(raw.prefixes) ? raw.prefixes.slice(0, 8).map(function (item) { return String(item).slice(0, 30); }) : [],
+        maxLength:Math.max(1, Math.min(Number(raw.maxLength) || 300, 1000))
+      };
+      if (Array.isArray(raw.enum)) property.enum = raw.enum.slice(0, 20).map(function (item) { return String(item).slice(0, 80); });
+      if (Number.isFinite(Number(raw.minimum))) property.minimum = Number(raw.minimum);
+      if (Number.isFinite(Number(raw.maximum))) property.maximum = Number(raw.maximum);
+      properties[name] = property;
+    });
+    return { type:'object', properties:properties, required:Array.isArray(schema.required) ? schema.required.filter(function (name) { return properties[name]; }).slice(0, 20) : [] };
+  }
+
+  function validateToolArgs(schema, value) {
+    schema = safeToolSchema(schema); value = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    var args = {}, errors = [];
+    Object.keys(schema.properties).forEach(function (name) {
+      if (value[name] == null || value[name] === '') return;
+      var property = schema.properties[name], item = value[name];
+      if (property.type === 'integer' && !Number.isInteger(Number(item))) { errors.push(name + ' 必須是整數'); return; }
+      if (property.type === 'number' && !Number.isFinite(Number(item))) { errors.push(name + ' 必須是數字'); return; }
+      if (property.type === 'boolean' && typeof item !== 'boolean') { errors.push(name + ' 必須是布林值'); return; }
+      if (property.type === 'number' || property.type === 'integer') {
+        item = Number(item);
+        if (property.minimum != null && item < property.minimum) errors.push(name + ' 小於允許範圍');
+        if (property.maximum != null && item > property.maximum) errors.push(name + ' 超過允許範圍');
+      } else if (property.type === 'string') {
+        item = String(item).slice(0, property.maxLength);
+        if (property.format === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item)) errors.push(name + ' 電子郵件格式無效');
+        if (property.format === 'url' && !/^https?:\/\//i.test(item)) errors.push(name + ' 網址格式無效');
+        if (property.format === 'phone' && !/(?:\d[^\d]*){8,18}/.test(item)) errors.push(name + ' 電話格式無效');
+        if (property.format === 'contact' && !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item) || /^(?:\+?\d[\s().-]*){8,18}$/.test(item))) errors.push(name + ' 必須是電子郵件或電話');
+      }
+      if (property.enum && property.enum.indexOf(String(item)) < 0) errors.push(name + ' 不在允許選項內');
+      args[name] = item;
+    });
+    schema.required.forEach(function (name) { if (args[name] == null || args[name] === '') errors.push(name + ' 為必填'); });
+    return { ok:errors.length === 0, args:args, errors:errors };
+  }
+
   function toolMetadata() {
     return Object.keys(toolRegistry).map(function (name) {
       var tool = toolRegistry[name];
-      return { name: name, label: tool.label, description: tool.description, keywords: tool.keywords, requiresConfirmation: tool.requiresConfirmation };
+      return {
+        name:name, label:tool.label, description:tool.description, keywords:tool.keywords,
+        examples:tool.examples, excludeKeywords:tool.excludeKeywords, priority:tool.priority,
+        routeThreshold:tool.routeThreshold, requiresConfirmation:tool.requiresConfirmation, inputSchema:tool.inputSchema
+      };
     });
   }
 
@@ -107,10 +201,63 @@
     all.slice().forEach(function (handler) { try { handler({ name: name, detail: detail || {} }); } catch (e) { console.error('[avatar] event handler error:', e); } });
   }
 
+  function applyExpandedSize() {
+    if (iframe.style.display === 'none') return;
+    root.style.width = 'min(' + EXPANDED.w + 'px, calc(100vw - 32px))';
+    root.style.height = 'min(' + EXPANDED.h + 'px, calc(100dvh - 24px))';
+  }
+
+  function setRemoteValue(key, value) {
+    if (explicitCfg[key] || value == null || value === '') return;
+    cfg.set(key, String(value));
+  }
+
+  function applyRemoteConfig(remote) {
+    if (!remote || typeof remote !== 'object' || Array.isArray(remote)) return;
+    setRemoteValue('model', remote.model2d);
+    setRemoteValue('vrm', remote.model3d);
+    setRemoteValue('engine', remote.engine);
+    setRemoteValue('fit', remote.fit);
+    setRemoteValue('voice', remote.voice);
+    setRemoteValue('lang', remote.locale);
+    setRemoteValue('mode', remote.mode);
+    setRemoteValue('brand', remote.brandColor);
+    setRemoteValue('name', remote.name);
+    setRemoteValue('welcome', remote.welcome);
+    setRemoteValue('greeting', remote.greeting);
+    setRemoteValue('fallback', remote.fallback);
+    if (!explicitCfg.suggestions && Array.isArray(remote.suggestions)) cfg.set('suggestions', JSON.stringify(remote.suggestions.slice(0, 8)));
+    if (!Number.isFinite(explicitWidth) && Number.isFinite(Number(remote.width))) EXPANDED.w = Math.max(280, Math.min(Math.round(Number(remote.width)), 480));
+    if (!Number.isFinite(explicitHeight) && Number.isFinite(Number(remote.height))) EXPANDED.h = Math.max(380, Math.min(Math.round(Number(remote.height)), 720));
+    if (remote.name) iframe.title = String(remote.name).slice(0, 80);
+    if (/^#[0-9a-f]{6}$/i.test(remote.brandColor || '')) bubble.style.background = remote.brandColor;
+    applyExpandedSize();
+  }
+
+  function loadRemoteConfig() {
+    if (!configAttr) return Promise.resolve();
+    try {
+      var target = new URL(configAttr, new URL(widgetUrl, location.href));
+      if (widgetOrigin !== '*' && target.origin !== widgetOrigin) throw new Error('角色設定網址必須和 widget 同來源');
+      var controller = new AbortController();
+      var timeout = setTimeout(function () { controller.abort(); }, 4000);
+      return fetch(target.href, { credentials:'omit', cache:'no-store', signal:controller.signal })
+        .then(function (response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+        .then(applyRemoteConfig)
+        .catch(function (error) { console.warn('[avatar] 公開角色設定載入失敗，改用嵌入預設值：', error && error.message || error); })
+        .finally(function () { clearTimeout(timeout); });
+    } catch (error) {
+      console.warn('[avatar] 角色設定網址無效：', error && error.message || error);
+      return Promise.resolve();
+    }
+  }
+
   function ensureIframe() {
     if (iframeLoaded) return;
     iframeLoaded = true;
-    iframe.src = iframeSrc; // 第一次展開才真正下載 widget、角色與渲染引擎
+    loadRemoteConfig().then(function () {
+      iframe.src = iframeSrc(); // 第一次展開才真正下載 widget、角色與渲染引擎
+    });
   }
 
   function sendToWidget(message) {
@@ -146,10 +293,9 @@
   function setOpen(open) {
     if (open) {
       ensureIframe();
-      root.style.width = 'min(' + EXPANDED.w + 'px, calc(100vw - 32px))';
-      root.style.height = 'min(' + EXPANDED.h + 'px, calc(100dvh - 24px))';
       iframe.style.display = 'block';
       bubble.style.display = 'none';
+      applyExpandedSize();
     } else {
       root.style.width = '60px';
       root.style.height = '60px';
@@ -180,13 +326,28 @@
       var tool = toolRegistry[d.name];
       if (!tool) {
         sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: '找不到這個網站操作' });
+      } else if (toolExecutions[d.name]) {
+        sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: '這個操作正在執行，請稍後再試。' });
       } else {
-        Promise.resolve().then(function () { return tool.execute(d.input || {}); }).then(function (result) {
+        var input = d.input && typeof d.input === 'object' ? d.input : {};
+        var validation = validateToolArgs(tool.inputSchema, input.args);
+        if (!validation.ok) {
+          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: validation.errors.join('；') });
+          return;
+        }
+        input.args = validation.args;
+        toolExecutions[d.name] = true;
+        var startedAt = Date.now();
+        var executionController = new AbortController();
+        input.signal = executionController.signal;
+        var timeout;
+        var timeoutPromise = new Promise(function (_, reject) { timeout = setTimeout(function () { executionController.abort(); reject(new Error('操作逾時，請稍後再試。')); }, tool.timeoutMs); });
+        Promise.race([Promise.resolve().then(function () { return tool.execute(input); }), timeoutPromise]).then(function (result) {
           var message = typeof result === 'string' ? result : (result && result.message) || '已完成「' + tool.label + '」。';
-          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: true, message: String(message).slice(0, 1200) });
+          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: true, message: String(message).slice(0, 1200), durationMs:Date.now() - startedAt });
         }).catch(function (error) {
-          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: String(error && error.message || error).slice(0, 500) });
-        });
+          sendToWidget({ ns: NS_OUT, type: 'tool-result', callId: d.callId, name: d.name, ok: false, error: String(error && error.message || error).slice(0, 500), durationMs:Date.now() - startedAt });
+        }).finally(function () { clearTimeout(timeout); delete toolExecutions[d.name]; });
       }
     }
     if (d.type === 'error') console.warn('[avatar] widget error:', d.message);
@@ -224,7 +385,13 @@
         label: String(definition.label || name).slice(0, 80),
         description: String(definition.description || '').slice(0, 240),
         keywords: Array.isArray(definition.keywords) ? definition.keywords.slice(0, 20).map(function (k) { return String(k).toLowerCase().slice(0, 60); }) : [],
+        examples: Array.isArray(definition.examples) ? definition.examples.slice(0, 20).map(function (item) { return String(item).slice(0, 160); }) : [],
+        excludeKeywords: Array.isArray(definition.excludeKeywords) ? definition.excludeKeywords.slice(0, 20).map(function (item) { return String(item).toLowerCase().slice(0, 60); }) : [],
+        priority: Math.max(-10, Math.min(Number(definition.priority) || 0, 10)),
+        routeThreshold: Math.max(0.15, Math.min(Number(definition.routeThreshold) || 0.34, 0.95)),
+        inputSchema: safeToolSchema(definition.inputSchema),
         requiresConfirmation: definition.requiresConfirmation !== false,
+        timeoutMs: Math.max(1000, Math.min(Number(definition.timeoutMs) || 12000, 30000)),
         execute: definition.execute
       };
       sendToWidget({ ns: NS_OUT, type: 'tools', tools: toolMetadata() });
@@ -269,4 +436,41 @@
       return this;
     }
   };
+
+  // data-leads 啟用內建詢價／預約工具。資料只會送到宿主網站同來源的端點。
+  var leadsAttr = me && me.getAttribute('data-leads');
+  if (leadsAttr) {
+    try {
+      var leadsUrl = new URL(leadsAttr, location.href);
+      if (leadsUrl.origin !== location.origin || !/^https?:$/.test(leadsUrl.protocol)) throw new Error('data-leads 必須是宿主網站同來源網址');
+      window.AvatarWidget.registerTool({
+        name:'lead_capture', label:'留下聯絡資料', description:'送出詢價、合作或預約需求，讓專人後續聯絡',
+        keywords:['詢價','報價','預約','聯絡我','請聯絡','業務聯絡','想合作','合作洽談','留下資料'],
+        examples:['我想詢價請聯絡我','想預約服務','請業務跟我聯絡','我有合作需求'],
+        excludeKeywords:['真人客服','人工客服','轉真人'], priority:3, routeThreshold:0.34, requiresConfirmation:true,
+        inputSchema:{ type:'object', properties:{
+          name:{ type:'string', title:'姓名或稱呼', prefixes:['我叫','姓名','稱呼'], maxLength:100 },
+          contact:{ type:'string', title:'電子郵件或電話', format:'contact', prefixes:['聯絡方式','電子郵件','email','電話'], maxLength:160 },
+          company:{ type:'string', title:'公司或單位（選填）', prefixes:['公司','單位'], maxLength:160 },
+          request:{ type:'string', title:'詢價或預約需求', prefixes:['需求','想詢問','想預約','合作內容'], maxLength:1200 },
+          consent:{ type:'boolean', title:'同意依隱私權政策使用以上資料聯繫', prefixes:['同意'] }
+        }, required:['name','contact','request','consent'] },
+        execute:async function (input) {
+          var args = input.args || {};
+          if (args.consent !== true) throw new Error('必須先同意依隱私權政策使用聯絡資料。');
+          var headers = { 'Content-Type':'application/json' };
+          if (cfg.get('sitekey')) headers['X-Avatar-Site-Key'] = cfg.get('sitekey');
+          var response = await fetch(leadsUrl.href, { method:'POST', headers:headers, body:JSON.stringify({
+            siteId:leadsUrl.searchParams.get('site') || 'default', name:args.name, contact:args.contact,
+            company:args.company || '', request:args.request, consent:true, website:'',
+            sourcePage:pageContext.url || '', sourceTitle:pageContext.title || ''
+          }), signal:input.signal });
+          var result = await response.json().catch(function () { return {}; });
+          if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
+          emit('lead_submitted', { leadId:String(result.leadId || '').slice(0, 60) });
+          return result.message || '資料已送出，專人會依你提供的方式聯絡。';
+        }
+      });
+    } catch (error) { console.warn('[avatar] 名單收集端點無效：', error && error.message || error); }
+  }
 })();

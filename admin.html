@@ -3,115 +3,636 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>虛擬人知識庫編輯器</title>
+  <meta name="robots" content="noindex,nofollow">
+  <title>虛擬人管理後台</title>
   <style>
-    :root { color-scheme:light; --brand:#5b54e8; --ink:#202033; --muted:#696a7d; --line:#dedfeb; --ok:#137a55; --bad:#b93838; }
+    :root { color-scheme:light; --brand:#5b54e8; --brand-dark:#4540bd; --ink:#202033; --muted:#696a7d; --line:#dedfeb; --ok:#137a55; --bad:#b93838; --warn:#9a6416; }
     * { box-sizing:border-box; }
-    body { margin:0; background:#f4f5fa; color:var(--ink); font-family:"Noto Sans TC",system-ui,sans-serif; }
-    main { width:min(1120px,calc(100% - 28px)); margin:28px auto; }
-    header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px; }
+    [hidden] { display:none!important; }
+    body { margin:0; min-height:100vh; background:linear-gradient(145deg,#f5f6fb,#ececf7); color:var(--ink); font-family:"Noto Sans TC",system-ui,sans-serif; }
+    main { width:min(1180px,calc(100% - 28px)); margin:26px auto 50px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
     h1 { margin:0 0 5px; font-size:clamp(24px,4vw,38px); }
+    h2 { margin:0 0 12px; font-size:17px; }
     p { margin:0; color:var(--muted); line-height:1.6; }
-    .grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr); gap:16px; }
+    a { color:var(--brand-dark); font-weight:700; }
+    code { background:#eeeef7; border-radius:5px; padding:2px 5px; }
     .card { background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 8px 24px rgba(31,32,62,.06); }
+    .gate { width:min(520px,100%); margin:10vh auto; text-align:center; }
+    .gate h2 { font-size:24px; }
+    #sign-in { display:flex; justify-content:center; margin-top:18px; }
+    #user-button { min-width:32px; min-height:32px; }
+    .top-actions { display:flex; align-items:center; gap:12px; }
+    .site-switcher { display:flex; align-items:center; gap:7px; }
+    .site-switcher label { color:var(--muted); font-size:12px; font-weight:800; }
+    .site-switcher select { min-height:38px; max-width:240px; border:1px solid var(--line); border-radius:10px; padding:0 30px 0 10px; background:#fff; color:var(--ink); font:inherit; }
+    #site-role { white-space:nowrap; }
+    .site-management { margin-bottom:16px; }
+    .site-management-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,.8fr); gap:16px; }
+    .site-settings-grid { display:grid; grid-template-columns:180px minmax(0,1fr) auto; gap:9px; align-items:end; }
+    .site-settings-grid .field { margin:0; }
+    .member-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+    #site-members { display:grid; gap:7px; max-height:230px; overflow:auto; }
+    .member-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; padding:9px; border:1px solid var(--line); border-radius:11px; }
+    .member-row code { min-width:0; overflow-wrap:anywhere; font-size:11px; }
+    .member-row select { min-height:32px; border:1px solid var(--line); border-radius:8px; background:#fff; font:inherit; font-size:12px; }
+    .member-row button { min-height:30px; padding:0 9px; font-size:11px; }
+    .member-add { display:grid; grid-template-columns:minmax(0,1fr) 120px auto; gap:8px; margin-top:9px; }
+    .member-add input,.member-add select { min-width:0; min-height:38px; border:1px solid var(--line); border-radius:10px; padding:0 10px; background:#fff; font:inherit; }
+    .site-create { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+    .site-create-grid { display:grid; grid-template-columns:150px minmax(180px,1fr) minmax(220px,1.3fr) auto; gap:8px; align-items:end; }
+    .site-key-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; margin-top:10px; }
+    .site-key-row input { min-width:0; min-height:38px; border:1px solid var(--line); border-radius:10px; padding:0 10px; background:#f8f8fc; font:12px ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .audit-panel { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+    #audit-list { display:grid; gap:7px; max-height:250px; overflow:auto; }
+    .audit-row { display:grid; grid-template-columns:120px minmax(0,1fr); gap:8px; padding:8px 9px; border:1px solid var(--line); border-radius:10px; font-size:11px; }
+    .audit-row time { color:var(--muted); }
+    .audit-row strong { display:block; margin-bottom:2px; }
+    .audit-row span { color:var(--muted); overflow-wrap:anywhere; }
+    #sites-status { min-height:20px; margin-top:9px; color:var(--muted); font-size:12px; }
+    .readonly-banner { margin-bottom:16px; padding:11px 14px; border:1px solid #d8c17d; border-radius:13px; background:#fff7df; color:#7b5717; font-size:13px; }
+    .grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(290px,.55fr); gap:16px; }
     .toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
-    button,.file-label { appearance:none; border:0; border-radius:10px; min-height:38px; padding:0 13px; display:inline-flex; align-items:center; cursor:pointer; background:#ececf6; color:#414258; font:700 13px inherit; }
+    button,.file-label,input { font:inherit; }
+    button,.file-label { appearance:none; border:0; border-radius:10px; min-height:38px; padding:0 13px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:#ececf6; color:#414258; font-size:13px; font-weight:750; }
     button.primary { background:var(--brand); color:#fff; }
-    button:focus-visible,.file-label:focus-within,textarea:focus { outline:3px solid rgba(91,84,232,.3); outline-offset:2px; }
+    button.publish { background:#176f52; color:#fff; }
+    button.danger { color:var(--bad); }
+    button:disabled { opacity:.55; cursor:wait; }
+    button:focus-visible,.file-label:focus-within,textarea:focus,input:focus { outline:3px solid rgba(91,84,232,.3); outline-offset:2px; }
     input[type=file] { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
-    textarea { width:100%; min-height:590px; resize:vertical; border:1px solid var(--line); border-radius:12px; padding:13px; color:#2a2a3c; background:#fbfbfe; font:12.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
-    #status { min-height:42px; border-radius:11px; padding:10px 12px; margin-bottom:12px; background:#f0f1f7; color:var(--muted); font-size:13px; line-height:1.55; }
+    .field { display:grid; gap:6px; margin-bottom:11px; }
+    .field label { font-size:12px; font-weight:750; color:#55566c; }
+    .field input { width:100%; min-height:40px; border:1px solid var(--line); border-radius:10px; padding:0 11px; }
+    .source-panel { margin-bottom:14px; border:1px solid #d9daf0; border-radius:14px; background:#f8f8fd; overflow:hidden; }
+    .source-panel summary { cursor:pointer; padding:12px 14px; font-weight:800; color:#3f4058; }
+    .source-body { padding:0 12px 12px; display:grid; gap:10px; }
+    .source-row { display:grid; grid-template-columns:1fr auto; gap:8px; }
+    .source-row input { min-width:0; min-height:40px; border:1px solid var(--line); border-radius:10px; padding:0 11px; }
+    #source-text { min-height:120px; font:13px/1.55 inherit; }
+    .source-help { font-size:11px; color:var(--muted); }
+    #import-status { min-height:20px; font-size:12px; color:var(--muted); }
+    textarea { width:100%; min-height:560px; resize:vertical; border:1px solid var(--line); border-radius:12px; padding:13px; color:#2a2a3c; background:#fbfbfe; font:12.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    #status { min-height:44px; border-radius:11px; padding:10px 12px; margin-bottom:12px; background:#f0f1f7; color:var(--muted); font-size:13px; line-height:1.55; }
     #status.ok { background:#e7f7f0; color:var(--ok); }
     #status.bad { background:#fdecec; color:var(--bad); }
-    #preview { display:grid; gap:9px; max-height:552px; overflow:auto; }
-    .entry { border:1px solid var(--line); border-radius:12px; padding:11px; }
-    .entry strong { display:block; margin-bottom:5px; font-size:13px; }
-    .entry span { color:var(--muted); font-size:12px; line-height:1.5; }
+    #status.warn { background:#fff5df; color:var(--warn); }
+    .side { display:grid; gap:16px; align-content:start; }
+    #versions,#preview { display:grid; gap:9px; max-height:300px; overflow:auto; }
+    .entry,.version { border:1px solid var(--line); border-radius:12px; padding:11px; }
+    .entry strong,.version strong { display:block; margin-bottom:5px; font-size:13px; }
+    .entry span,.version span { display:block; color:var(--muted); font-size:12px; line-height:1.5; }
+    .version-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .badge { border-radius:999px; padding:3px 7px; background:#ececf6; color:#5d5e72; font-size:10px; font-weight:800; }
+    .badge.live { background:#dff5eb; color:var(--ok); }
+    .version button { margin-top:8px; min-height:30px; padding:0 9px; font-size:11px; }
     .privacy { margin-top:12px; font-size:12px; }
-    @media(max-width:800px){ header{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}textarea{min-height:440px} }
+    .analytics { margin-bottom:16px; }
+    .analytics-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .analytics-actions { display:flex; gap:8px; align-items:center; }
+    .analytics-actions select { min-height:38px; border:1px solid var(--line); border-radius:10px; padding:0 32px 0 10px; background:#fff; color:var(--ink); font:inherit; }
+    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+    .metric { min-width:0; padding:13px; border-radius:14px; background:#f5f5fb; border:1px solid #e5e5f1; }
+    .metric strong { display:block; font-size:25px; line-height:1.15; margin-bottom:4px; }
+    .metric span { color:var(--muted); font-size:12px; }
+    .analytics-grid { display:grid; grid-template-columns:1.2fr .8fr .8fr .8fr; gap:12px; }
+    .analytics-box { min-width:0; border:1px solid var(--line); border-radius:14px; padding:12px; }
+    .analytics-box h3 { margin:0 0 10px; font-size:13px; }
+    .analytics-list { display:grid; gap:7px; max-height:220px; overflow:auto; }
+    .analytics-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; font-size:12px; }
+    .analytics-row span:first-child { overflow-wrap:anywhere; }
+    .analytics-row strong { color:var(--brand-dark); }
+    .trend-row { display:grid; grid-template-columns:44px minmax(0,1fr) 28px; gap:7px; align-items:center; font-size:11px; color:var(--muted); }
+    .trend-track { height:9px; background:#ededf6; border-radius:99px; overflow:hidden; }
+    .trend-bar { height:100%; min-width:2px; border-radius:99px; background:linear-gradient(90deg,var(--brand),#8b84f5); }
+    #analytics-status { min-height:18px; color:var(--muted); font-size:12px; }
+    .support { margin-bottom:16px; }
+    .support-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .support-head-actions { display:flex; align-items:center; gap:8px; }
+    .support-head select { min-height:38px; border:1px solid var(--line); border-radius:10px; padding:0 30px 0 10px; background:#fff; font:inherit; }
+    .support-layout { display:grid; grid-template-columns:300px minmax(0,1fr); min-height:430px; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    .case-list { border-right:1px solid var(--line); background:#fafafe; overflow:auto; max-height:600px; }
+    .case-item { width:100%; height:auto; min-height:82px; padding:12px; border-radius:0; border-bottom:1px solid var(--line); background:transparent; display:grid; gap:5px; justify-items:start; text-align:left; }
+    .case-item:hover,.case-item.active { background:#eeeeff; }
+    .case-item strong { font-size:13px; }
+    .case-item span { color:var(--muted); font-size:11px; }
+    .case-status { border-radius:999px; padding:2px 7px; background:#fff0d6; color:#8a5b13!important; font-weight:800; }
+    .case-status.assigned { background:#e8e7ff; color:var(--brand-dark)!important; }
+    .case-status.resolved { background:#e4f5ed; color:var(--ok)!important; }
+    .support-detail { min-width:0; display:grid; grid-template-rows:auto minmax(240px,1fr) auto; }
+    .support-detail-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:13px; border-bottom:1px solid var(--line); }
+    .support-detail-head h3 { margin:0 0 4px; font-size:15px; overflow-wrap:anywhere; }
+    .support-detail-head span { color:var(--muted); font-size:11px; }
+    .support-case-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .support-case-actions button { min-height:32px; padding:0 10px; font-size:11px; }
+    .support-messages { padding:13px; display:flex; flex-direction:column; gap:9px; overflow:auto; max-height:420px; background:#fdfdff; }
+    .support-message { max-width:82%; border-radius:13px; padding:9px 11px; background:#eeeeF7; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+    .support-message.visitor { align-self:flex-start; }
+    .support-message.bot { align-self:flex-start; background:#f2f2f8; border-left:3px solid #aaa8d7; }
+    .support-message.agent { align-self:flex-end; background:#e8e7ff; }
+    .support-message.note { align-self:stretch; max-width:none; background:#fff3d9; border:1px dashed #ddb86d; }
+    .support-message.system { align-self:center; background:transparent; color:var(--muted); font-size:11px; text-align:center; }
+    .support-message small { display:block; margin-top:4px; color:var(--muted); font-size:10px; }
+    .support-compose { padding:12px; border-top:1px solid var(--line); display:grid; gap:8px; }
+    .support-compose textarea { min-height:78px; font:13px/1.5 inherit; }
+    .support-compose-actions { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+    #support-status { color:var(--muted); font-size:12px; }
+    .leads { margin-bottom:16px; }
+    .leads-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .leads-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .leads-actions select,.leads-actions input { min-height:38px; border:1px solid var(--line); border-radius:10px; padding:0 10px; background:#fff; font:inherit; }
+    .leads-actions input { width:190px; }
+    .leads-layout { display:grid; grid-template-columns:340px minmax(0,1fr); min-height:390px; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    .lead-list { border-right:1px solid var(--line); background:#fafafe; overflow:auto; max-height:560px; }
+    .lead-item { width:100%; height:auto; min-height:96px; padding:12px; border-radius:0; border-bottom:1px solid var(--line); background:transparent; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 8px; justify-items:start; text-align:left; }
+    .lead-item:hover,.lead-item.active { background:#eeeeff; }
+    .lead-item strong { font-size:13px; overflow-wrap:anywhere; }
+    .lead-item .lead-summary { grid-column:1 / -1; color:var(--muted); font-size:11px; line-height:1.45; overflow-wrap:anywhere; }
+    .lead-status { border-radius:999px; padding:2px 7px; background:#fff0d6; color:#8a5b13; font-size:10px; font-weight:800; }
+    .lead-status.contacted { background:#e8e7ff; color:var(--brand-dark); }
+    .lead-status.qualified { background:#dff5eb; color:var(--ok); }
+    .lead-status.closed { background:#ececf1; color:#666779; }
+    .lead-detail { min-width:0; padding:14px; display:grid; gap:12px; align-content:start; }
+    .lead-detail h3 { margin:0; font-size:17px; }
+    .lead-detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .lead-value { min-width:0; padding:10px; border:1px solid var(--line); border-radius:11px; background:#fbfbfe; }
+    .lead-value.wide { grid-column:1 / -1; }
+    .lead-value small { display:block; margin-bottom:4px; color:var(--muted); font-size:10px; font-weight:800; }
+    .lead-value span,.lead-value a { color:var(--ink); font-size:13px; line-height:1.55; overflow-wrap:anywhere; }
+    .lead-editor { display:grid; grid-template-columns:200px minmax(0,1fr) auto; gap:8px; align-items:end; }
+    .lead-editor .field { margin:0; }
+    .lead-editor select { width:100%; min-height:40px; border:1px solid var(--line); border-radius:10px; padding:0 10px; background:#fff; font:inherit; }
+    .lead-editor textarea { min-height:76px; padding:9px 10px; font:13px/1.45 inherit; }
+    #leads-status { color:var(--muted); font-size:12px; }
+    .avatar-settings { margin-bottom:16px; }
+    .avatar-settings-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .avatar-settings-layout { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(310px,.75fr); gap:16px; }
+    .config-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+    .config-grid .field { margin:0; }
+    .config-grid .wide { grid-column:1 / -1; }
+    .config-grid select,.config-grid textarea { width:100%; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font:inherit; }
+    .config-grid select { min-height:40px; padding:0 32px 0 11px; }
+    .config-grid textarea { min-height:78px; resize:vertical; padding:10px 11px; font-size:13px; line-height:1.5; }
+    .config-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; }
+    #avatar-config-status { min-height:20px; margin-top:9px; font-size:12px; }
+    #avatar-config-status.ok { color:var(--ok); }
+    #avatar-config-status.bad { color:var(--bad); }
+    .avatar-preview-panel { min-width:0; display:grid; gap:10px; align-content:start; }
+    .avatar-preview-shell { min-height:420px; border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; align-items:flex-end; justify-content:center; background:linear-gradient(145deg,#f1f2fa,#e6e7f4); }
+    #avatar-preview-frame { display:block; border:0; background:transparent; max-width:100%; transform-origin:bottom center; }
+    #avatar-config-versions { display:grid; gap:8px; max-height:220px; overflow:auto; }
+    .config-version { border:1px solid var(--line); border-radius:11px; padding:10px; display:grid; gap:4px; }
+    .config-version-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .config-version span { color:var(--muted); font-size:11px; }
+    .config-version button { justify-self:start; margin-top:3px; min-height:30px; padding:0 9px; font-size:11px; }
+    @media(max-width:1000px){.analytics-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:900px){.avatar-settings-layout,.site-management-layout{grid-template-columns:1fr}.avatar-preview-shell{min-height:480px}.site-settings-grid,.site-create-grid{grid-template-columns:1fr 1fr}.site-settings-grid button,.site-create-grid button{align-self:end}}
+    @media(max-width:820px){ header{align-items:flex-start}.grid{grid-template-columns:1fr}#editor{min-height:420px}.top-actions{align-items:flex-end}.source-row{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.support-layout,.leads-layout{grid-template-columns:1fr}.case-list,.lead-list{border-right:0;border-bottom:1px solid var(--line);max-height:240px}.support-head,.leads-head{display:grid}.lead-editor{grid-template-columns:1fr} }
+    @media(max-width:560px){header{display:grid}.top-actions{flex-wrap:wrap}.site-switcher{width:100%}.site-switcher select{flex:1;min-width:0}.analytics-head,.avatar-settings-head{display:grid}.analytics-actions{flex-wrap:wrap}.analytics-grid,.config-grid,.lead-detail-grid,.site-settings-grid,.site-create-grid,.member-add,.site-key-row{grid-template-columns:1fr}.config-grid .wide,.lead-value.wide{grid-column:auto}.leads-actions input{width:100%}}
+
+    /* 產品化後台外框 */
+    body > main { width:100%; margin:0; }
+    #app { min-height:100vh; }
+    #app > .admin-shell { min-height:100vh; display:grid; grid-template-columns:250px minmax(0,1fr); }
+    .admin-sidebar { position:sticky; top:0; height:100vh; padding:22px 16px; display:flex; flex-direction:column; gap:22px; overflow:auto; background:#17182b; color:#fff; }
+    .admin-brand { display:flex; align-items:center; gap:11px; padding:0 8px; }
+    .admin-brand-mark { width:40px; height:40px; border-radius:13px; display:grid; place-items:center; background:linear-gradient(145deg,#746ef4,#4e48c8); box-shadow:0 8px 24px rgba(91,84,232,.38); font-weight:900; }
+    .admin-brand strong { display:block; font-size:15px; }
+    .admin-brand span { display:block; margin-top:2px; color:#aeb0c9; font-size:11px; }
+    .admin-nav-label { padding:0 10px; color:#777a99; font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+    .admin-nav { display:grid; gap:5px; }
+    .admin-nav button { min-height:44px; width:100%; padding:0 12px; justify-content:flex-start; gap:11px; border-radius:12px; background:transparent; color:#bfc1d7; font-size:13px; font-weight:750; }
+    .admin-nav button:hover { background:#22243b; color:#fff; }
+    .admin-nav button[aria-current="page"] { background:#302e5a; color:#fff; box-shadow:inset 3px 0 0 #8b85ff; }
+    .admin-nav-icon { width:26px; height:26px; border-radius:8px; display:grid; place-items:center; background:rgba(255,255,255,.07); color:#d6d5ff; font-size:10px; font-weight:900; }
+    .admin-sidebar-footer { margin-top:auto; padding:14px 10px 0; border-top:1px solid rgba(255,255,255,.08); }
+    .admin-sidebar-footer a { display:flex; align-items:center; gap:8px; color:#bfc1d7; text-decoration:none; font-size:12px; }
+    .admin-sidebar-footer a:hover { color:#fff; }
+    .admin-main { min-width:0; background:#f4f5fa; }
+    .admin-topbar { position:sticky; top:0; z-index:20; margin:0; padding:18px clamp(18px,3vw,38px); border-bottom:1px solid #e3e4ee; background:rgba(255,255,255,.92); backdrop-filter:blur(15px); }
+    .admin-topbar h1 { font-size:clamp(21px,3vw,29px); }
+    .admin-topbar p { font-size:12px; }
+    .admin-topbar .top-actions > a { display:none; }
+    .admin-content { width:min(1380px,100%); margin:0 auto; padding:24px clamp(16px,3vw,34px) 54px; }
+    .workspace-page { display:none; }
+    .workspace-page.active { display:block; }
+    .grid.workspace-page.active { display:grid; }
+    .workspace-page.card,.dashboard-card { box-shadow:0 5px 18px rgba(31,32,62,.045); }
+    .dashboard-hero { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(260px,.65fr); gap:24px; padding:28px; border:0; background:linear-gradient(125deg,#252649,#383877 62%,#5d57db); color:#fff; }
+    .dashboard-hero::after { content:""; position:absolute; width:260px; height:260px; right:-85px; top:-115px; border-radius:50%; border:45px solid rgba(255,255,255,.07); }
+    .dashboard-hero h2 { margin-bottom:8px; font-size:clamp(23px,3vw,34px); }
+    .dashboard-hero p { max-width:650px; color:#d7d8ef; }
+    .dashboard-hero-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; align-items:center; align-content:center; justify-content:flex-end; gap:9px; }
+    .dashboard-hero-actions button { background:#fff; color:#29294c; }
+    .dashboard-hero-actions button.secondary { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.2); }
+    .dashboard-section-title { margin:23px 0 11px; display:flex; align-items:end; justify-content:space-between; gap:12px; }
+    .dashboard-section-title h2 { margin:0; font-size:16px; }
+    .dashboard-section-title p { font-size:11px; }
+    .dashboard-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .dashboard-metric { min-width:0; padding:17px; border:1px solid #e2e3ed; border-radius:15px; background:#fff; }
+    .dashboard-metric-head { display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:11px; font-weight:750; }
+    .dashboard-metric-icon { width:29px; height:29px; border-radius:9px; display:grid; place-items:center; background:#ecebff; color:var(--brand-dark); font-size:10px; font-weight:900; }
+    .dashboard-metric strong { display:block; margin:15px 0 5px; font-size:28px; line-height:1; }
+    .dashboard-metric small { color:var(--muted); font-size:10px; }
+    .dashboard-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr); gap:14px; }
+    .dashboard-card { padding:18px; border:1px solid #e2e3ed; border-radius:16px; background:#fff; }
+    .dashboard-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:13px; }
+    .dashboard-card-head h2 { margin:0; font-size:15px; }
+    .dashboard-card-head button { min-height:31px; padding:0 9px; font-size:11px; }
+    .dashboard-queue { display:grid; gap:8px; }
+    .dashboard-queue-item { width:100%; min-height:64px; padding:11px 12px; border:1px solid #e6e6ef; background:#fafafe; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; justify-content:stretch; text-align:left; }
+    .dashboard-queue-item:hover { background:#f1f0ff; }
+    .queue-dot { width:10px; height:10px; margin-top:5px; border-radius:50%; background:#e3a82f; }
+    .queue-dot.purple { background:#7069e8; }
+    .dashboard-queue-item strong { display:block; font-size:13px; }
+    .dashboard-queue-item span { display:block; margin-top:3px; color:var(--muted); font-size:11px; font-weight:500; }
+    .queue-count { min-width:27px; height:27px; border-radius:9px; display:grid; place-items:center; background:#eeedf8; color:#4d4e65; font-size:11px; font-weight:900; }
+    .system-list { display:grid; gap:10px; }
+    .system-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding-bottom:10px; border-bottom:1px solid #eeeeF4; font-size:12px; }
+    .system-row:last-child { padding:0; border:0; }
+    .system-state { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; font-weight:750; }
+    .system-state::before { content:""; width:7px; height:7px; border-radius:50%; background:#9a9bac; }
+    .system-state.ok { color:var(--ok); }
+    .system-state.ok::before { background:#2bb77c; box-shadow:0 0 0 4px rgba(43,183,124,.12); }
+    .system-state.bad { color:var(--bad); }
+    .system-state.bad::before { background:var(--bad); box-shadow:0 0 0 4px rgba(185,56,56,.1); }
+    .install-code { margin:0; min-height:112px; width:100%; padding:13px; resize:vertical; border:1px solid #dedfeb; border-radius:12px; background:#17182b; color:#e8e8f7; font:11px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .dashboard-install-note { margin-top:9px; font-size:11px; }
+    .install-wizard { padding:20px; }
+    .install-wizard-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+    .install-wizard-head h2 { margin-bottom:5px; font-size:20px; }
+    .install-steps { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+    .install-step { display:flex; align-items:center; gap:8px; min-width:0; padding:10px; border:1px solid var(--line); border-radius:12px; background:#f8f8fc; color:var(--muted); font-size:11px; font-weight:800; }
+    .install-step span { flex:0 0 auto; width:24px; height:24px; border-radius:8px; display:grid; place-items:center; background:#e8e8f3; color:#55566c; }
+    .install-step.ready { border-color:#cbc9f7; background:#f2f1ff; color:var(--brand-dark); }
+    .install-step.ready span { background:var(--brand); color:#fff; }
+    .install-wizard-grid { display:grid; grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr); gap:14px; align-items:start; }
+    .install-panel { min-width:0; padding:16px; border:1px solid var(--line); border-radius:14px; background:#fff; }
+    .install-panel + .install-panel { margin-top:14px; }
+    .install-panel h3 { margin:0 0 5px; font-size:14px; }
+    .install-panel > p { margin-bottom:13px; font-size:11px; }
+    .install-summary { display:grid; gap:8px; }
+    .install-summary-row { display:grid; grid-template-columns:90px minmax(0,1fr); gap:9px; padding:9px 10px; border-radius:10px; background:#f7f7fb; font-size:12px; }
+    .install-summary-row span { color:var(--muted); }
+    .install-summary-row strong { overflow-wrap:anywhere; }
+    .install-feature-list { display:grid; gap:8px; }
+    .install-feature { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; padding:10px; border:1px solid #e5e5ef; border-radius:11px; cursor:pointer; }
+    .install-feature:hover { background:#fafaff; }
+    .install-feature input { width:17px; height:17px; margin:2px 0 0; accent-color:var(--brand); }
+    .install-feature strong { display:block; font-size:12px; }
+    .install-feature small { display:block; margin-top:3px; color:var(--muted); font-size:10px; line-height:1.45; }
+    .install-origin { width:100%; min-height:40px; margin-bottom:10px; border:1px solid var(--line); border-radius:10px; padding:0 11px; }
+    .install-code { min-height:210px; }
+    .install-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .install-checks { display:grid; gap:8px; }
+    .install-check { display:grid; grid-template-columns:auto minmax(0,1fr); gap:9px; align-items:start; padding:9px 10px; border:1px solid var(--line); border-radius:10px; font-size:11px; }
+    .install-check-mark { width:20px; height:20px; border-radius:7px; display:grid; place-items:center; background:#ececf3; color:var(--muted); font-size:10px; font-weight:900; }
+    .install-check.ok .install-check-mark { background:#dff5eb; color:var(--ok); }
+    .install-check.bad .install-check-mark { background:#fde7e7; color:var(--bad); }
+    .install-check strong { display:block; margin-bottom:2px; }
+    .install-check small { color:var(--muted); line-height:1.45; }
+    .readonly-banner { margin-bottom:16px; }
+    .preview-banner { border-color:#aaa7ed; background:#efefff; color:#4540a5; }
+
+    @media(max-width:1050px){
+      #app > .admin-shell{grid-template-columns:210px minmax(0,1fr)}
+      .dashboard-metrics{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:820px){
+      #app > .admin-shell{display:block}
+      .admin-sidebar{position:sticky; z-index:30; height:auto; padding:10px 12px; gap:10px; overflow:visible}
+      .admin-brand{display:none}
+      .admin-nav-label,.admin-sidebar-footer{display:none}
+      .admin-nav{display:flex; gap:5px; overflow-x:auto; scrollbar-width:none}
+      .admin-nav::-webkit-scrollbar{display:none}
+      .admin-nav button{width:auto; min-width:max-content; min-height:39px; padding:0 10px}
+      .admin-nav-icon{width:23px;height:23px}
+      .admin-topbar{top:59px; padding:13px 16px}
+      .admin-topbar h1{font-size:19px}
+      .admin-topbar p{display:none}
+      .admin-content{padding-top:16px}
+      .dashboard-hero,.dashboard-grid{grid-template-columns:1fr}
+      .install-wizard-grid{grid-template-columns:1fr}
+      .dashboard-hero-actions{justify-content:flex-start}
+    }
+    @media(max-width:560px){
+      .admin-topbar{display:grid; gap:10px}
+      .admin-topbar .top-actions{align-items:center}
+      .dashboard-hero{padding:21px}
+      .dashboard-metrics{grid-template-columns:1fr 1fr;gap:8px}
+      .dashboard-metric{padding:13px}
+      .dashboard-metric strong{font-size:23px}
+      .dashboard-grid{grid-template-columns:1fr}
+      .install-steps{grid-template-columns:1fr 1fr}
+    }
   </style>
 </head>
 <body>
 <main>
-  <header>
-    <div><h1>知識庫編輯器</h1><p>編輯、驗證並匯出可直接給 <code>data-knowledge</code> 使用的 JSON。</p></div>
-    <a href="./" aria-label="回到示範首頁">回示範首頁</a>
-  </header>
-  <div class="grid">
-    <section class="card" aria-label="編輯知識庫">
-      <div class="toolbar">
-        <button class="primary" id="validate" type="button">驗證並預覽</button>
-        <label class="file-label">匯入 JSON<input id="file" type="file" accept="application/json,.json"></label>
-        <button id="download" type="button">下載 knowledge.json</button>
-        <button id="copy" type="button">複製 JSON</button>
+  <section id="loading" class="card gate"><h2>正在準備管理後台</h2><p>檢查登入與永久資料庫設定中…</p></section>
+
+  <section id="setup" class="card gate" hidden>
+    <h2>後台尚未完成連線</h2>
+    <p id="setup-message">需要設定登入與資料庫。</p>
+    <p style="margin-top:12px">請依 <code>.env.example</code> 設定 Clerk、管理者 ID 與 Neon <code>DATABASE_URL</code>。</p>
+    <div id="setup-user-button" style="display:flex;justify-content:center;margin-top:16px"></div>
+  </section>
+
+  <section id="auth" class="card gate" hidden>
+    <h2>登入虛擬人管理後台</h2>
+    <p>只有列入管理者名單的帳號能管理角色、內容、潛在客戶與客服案件。</p>
+    <div id="sign-in"></div>
+  </section>
+
+  <section id="app" hidden>
+    <div class="admin-shell">
+      <aside class="admin-sidebar" aria-label="後台功能導覽">
+        <div class="admin-brand"><span class="admin-brand-mark">AI</span><div><strong>Avatar Console</strong><span>虛擬人營運中心</span></div></div>
+        <div>
+          <div class="admin-nav-label">Workspace</div>
+          <nav class="admin-nav">
+            <button type="button" data-nav-page="overview" aria-current="page"><span class="admin-nav-icon">OV</span>總覽</button>
+            <button type="button" data-nav-page="avatar"><span class="admin-nav-icon">AV</span>虛擬人設定</button>
+            <button type="button" data-nav-page="knowledge"><span class="admin-nav-icon">KB</span>知識庫</button>
+            <button type="button" data-nav-page="support"><span class="admin-nav-icon">CS</span>真人客服</button>
+            <button type="button" data-nav-page="leads"><span class="admin-nav-icon">LD</span>潛在客戶</button>
+            <button type="button" data-nav-page="analytics"><span class="admin-nav-icon">AN</span>使用分析</button>
+            <button type="button" data-nav-page="install"><span class="admin-nav-icon">IN</span>安裝精靈</button>
+            <button type="button" data-nav-page="settings" data-owner-only><span class="admin-nav-icon">ST</span>網站與成員</button>
+          </nav>
+        </div>
+        <div class="admin-sidebar-footer"><a href="./"><span class="admin-nav-icon">↗</span>查看示範網站</a></div>
+      </aside>
+      <div class="admin-main">
+        <header class="admin-topbar">
+      <div><h1 id="admin-page-title">營運總覽</h1><p id="admin-page-subtitle">掌握虛擬人的對話、客服與轉換狀況。</p></div>
+      <div class="top-actions">
+        <div class="site-switcher"><label for="site-select">網站</label><select id="site-select" aria-label="切換管理網站"></select><span id="site-role" class="badge">—</span></div>
+        <a href="./">回示範首頁</a><div id="user-button"></div>
       </div>
-      <textarea id="editor" spellcheck="false" aria-label="知識庫 JSON 編輯區"></textarea>
-      <p class="privacy">內容只在你的瀏覽器中編輯，不會自動上傳或儲存。下載後請部署到自己的網站，再以 <code>data-knowledge</code> 指向該檔案。</p>
+    </header>
+    <div class="admin-content">
+    <div id="preview-banner" class="readonly-banner preview-banner" hidden>目前是本機唯讀預覽，畫面使用示範資料；正式環境仍會要求 Clerk 登入與網站權限。</div>
+    <div id="readonly-banner" class="readonly-banner" hidden>你目前是 viewer，只能查看資料，不能發布內容、回覆客服或修改名單。</div>
+    <section id="dashboard" class="workspace-page active" data-workspace="overview" aria-labelledby="dashboard-title">
+      <div class="card dashboard-hero">
+        <div><h2 id="dashboard-title">讓每一次對話都能被看見、被改善</h2><p>這裡整合目前網站的虛擬人內容、匿名使用數據、真人客服與潛在客戶，讓你從同一個工作區完成日常營運。</p></div>
+        <div class="dashboard-hero-actions"><button type="button" data-go-page="avatar">調整虛擬人</button><button type="button" class="secondary" data-go-page="knowledge">更新知識庫</button></div>
+      </div>
+      <div class="dashboard-section-title"><div><h2 id="dashboard-period-label">最近 30 天</h2><p>資料會隨上方選擇的網站切換</p></div><button type="button" data-go-page="analytics">查看完整分析</button></div>
+      <div class="dashboard-metrics">
+        <div class="dashboard-metric"><div class="dashboard-metric-head"><span>對話工作階段</span><span class="dashboard-metric-icon">SE</span></div><strong id="dashboard-sessions">—</strong><small>匿名工作階段</small></div>
+        <div class="dashboard-metric"><div class="dashboard-metric-head"><span>收到問題</span><span class="dashboard-metric-icon">QU</span></div><strong id="dashboard-questions">—</strong><small>訪客主動提出的問題</small></div>
+        <div class="dashboard-metric"><div class="dashboard-metric-head"><span>知識未命中率</span><span class="dashboard-metric-icon">KB</span></div><strong id="dashboard-fallback">—</strong><small>可用來安排知識補強</small></div>
+        <div class="dashboard-metric"><div class="dashboard-metric-head"><span>轉真人需求</span><span class="dashboard-metric-icon">CS</span></div><strong id="dashboard-handoffs">—</strong><small>需要人工協助的對話</small></div>
+      </div>
+      <div class="dashboard-section-title"><div><h2>今日工作台</h2><p>先處理需要人工介入的項目</p></div></div>
+      <div class="dashboard-grid">
+        <section class="dashboard-card"><div class="dashboard-card-head"><h2>待處理項目</h2><span class="badge">即時</span></div><div class="dashboard-queue">
+          <button class="dashboard-queue-item" type="button" data-go-page="support"><span class="queue-dot"></span><span><strong>真人客服案件</strong><span>查看未接手與處理中的對話</span></span><span id="dashboard-support-count" class="queue-count">—</span></button>
+          <button class="dashboard-queue-item" type="button" data-go-page="leads"><span class="queue-dot purple"></span><span><strong>新潛在客戶</strong><span>追蹤尚未聯絡的詢價與預約</span></span><span id="dashboard-lead-count" class="queue-count">—</span></button>
+        </div></section>
+        <section class="dashboard-card"><div class="dashboard-card-head"><h2>系統狀態</h2><button id="dashboard-health-refresh" type="button">重新檢查</button></div><div class="system-list">
+          <div class="system-row"><span>API 與資料庫</span><span id="dashboard-health" class="system-state">檢查中</span></div>
+          <div class="system-row"><span>角色設定</span><span id="dashboard-avatar-state" class="system-state">載入中</span></div>
+          <div class="system-row"><span>知識庫</span><span id="dashboard-knowledge-state" class="system-state">載入中</span></div>
+        </div></section>
+      </div>
+      <div class="dashboard-section-title"><div><h2>安裝到網站</h2><p>複製後貼到網站的 &lt;/body&gt; 前</p></div><button id="dashboard-copy-install" type="button">複製嵌入碼</button></div>
+      <section class="dashboard-card"><textarea id="dashboard-install-code" class="install-code" readonly aria-label="網站嵌入碼"></textarea><p class="dashboard-install-note">公開寫入識別碼只會在產生或輪替當下顯示；若嵌入碼中仍是提示文字，請到「網站與成員」產生後貼上。</p></section>
     </section>
-    <aside class="card" aria-label="驗證結果與預覽">
-      <div id="status">尚未驗證。</div>
-      <div id="preview"></div>
-    </aside>
-  </div>
+    <section class="card install-wizard workspace-page" data-workspace="install" aria-labelledby="install-title">
+      <div class="install-wizard-head"><div><h2 id="install-title">網站安裝精靈</h2><p>選擇要開啟的功能，產生可直接貼上的嵌入碼，並在上線前檢查必要設定。</p></div><span id="install-readiness" class="badge">尚未檢查</span></div>
+      <div class="install-steps" aria-label="安裝步驟">
+        <div class="install-step ready"><span>1</span>確認網站</div><div class="install-step ready"><span>2</span>選擇功能</div><div class="install-step ready"><span>3</span>複製嵌入碼</div><div id="install-step-check" class="install-step"><span>4</span>完成檢查</div>
+      </div>
+      <div class="install-wizard-grid">
+        <div>
+          <section class="install-panel"><h3>網站資料</h3><p>精靈會依目前選擇的網站自動帶入設定。</p><div class="install-summary">
+            <div class="install-summary-row"><span>網站</span><strong id="install-site-name">—</strong></div>
+            <div class="install-summary-row"><span>站點代號</span><strong id="install-site-id">—</strong></div>
+            <div class="install-summary-row"><span>主要網域</span><strong id="install-site-origin">—</strong></div>
+            <div class="install-summary-row"><span>公開識別碼</span><strong id="install-key-status">—</strong></div>
+          </div><div class="install-actions"><button type="button" data-go-page="settings" data-owner-only>管理網站設定</button></div></section>
+          <section class="install-panel"><h3>啟用功能</h3><p>角色設定與知識庫為核心功能；其他項目可依需求開啟。</p><div class="install-feature-list">
+            <label class="install-feature"><input id="install-feature-config" type="checkbox" checked disabled><span><strong>角色設定</strong><small>載入後台發布的角色、聲線、品牌色與文案。</small></span></label>
+            <label class="install-feature"><input id="install-feature-knowledge" type="checkbox" checked><span><strong>知識庫</strong><small>讓虛擬人讀取目前發布的問答內容。</small></span></label>
+            <label class="install-feature"><input id="install-feature-analytics" type="checkbox" checked><span><strong>匿名使用分析</strong><small>記錄問題、回答來源與知識未命中狀況。</small></span></label>
+            <label class="install-feature"><input id="install-feature-handoff" type="checkbox" checked><span><strong>真人客服</strong><small>允許訪客建立客服案件並接收真人回覆。</small></span></label>
+            <label class="install-feature"><input id="install-feature-leads" type="checkbox" checked><span><strong>詢價與預約</strong><small>經訪客同意後收集聯絡方式與需求。</small></span></label>
+          </div></section>
+        </div>
+        <div>
+          <section class="install-panel"><h3>嵌入來源</h3><p>通常使用這個後台所在的網址；正式上線後請改成正式 HTTPS 網域。</p><input id="install-script-origin" class="install-origin" type="url" aria-label="虛擬人服務網址"><textarea id="install-generated-code" class="install-code" readonly aria-label="安裝精靈產生的嵌入碼"></textarea><div class="install-actions"><button id="install-copy-code" class="primary" type="button">複製嵌入碼</button><button id="install-reset-options" type="button">恢復建議設定</button></div><p class="dashboard-install-note">若使用跨網域載入器，詢價／預約端點仍需由宿主網站提供同來源代理；其餘公開端點應與 widget 同來源。</p></section>
+          <section class="install-panel"><div class="dashboard-card-head"><div><h3>上線前檢查</h3><p>確認網域、識別碼與公開端點是否已準備完成。</p></div><button id="install-run-checks" type="button">開始檢查</button></div><div id="install-check-list" class="install-checks"><div class="install-check"><span class="install-check-mark">…</span><span><strong>等待檢查</strong><small>按下「開始檢查」後會逐項顯示結果。</small></span></div></div></section>
+        </div>
+      </div>
+    </section>
+    <section id="site-management" class="card site-management workspace-page" data-workspace="settings" aria-labelledby="site-management-title" hidden>
+      <div class="member-head"><div><h2 id="site-management-title">網站與成員管理</h2><p>owner 可設定網站資料並用 Clerk User ID 指派成員權限。</p></div><button id="sites-refresh" type="button">重新整理</button></div>
+      <div class="site-management-layout">
+        <div>
+          <div class="site-settings-grid">
+            <div class="field"><label for="site-current-id">網站代號</label><input id="site-current-id" readonly></div>
+            <div class="field"><label for="site-current-name">網站名稱</label><input id="site-current-name" maxlength="100"></div>
+            <button id="site-update" class="primary" type="button">儲存網站</button>
+            <div class="field" style="grid-column:1 / -1"><label for="site-current-origin">主要網域</label><input id="site-current-origin" type="url" maxlength="500" placeholder="https://example.com"></div>
+          </div>
+          <div class="site-key-row">
+            <input id="site-public-key" readonly aria-label="網站公開寫入識別碼" value="尚未啟用">
+            <button id="site-key-copy" type="button" hidden>複製</button>
+            <button id="site-key-rotate" type="button">產生／輪替識別碼</button>
+          </div>
+          <p class="privacy">識別碼要放在嵌入碼的 <code>data-site-key</code>。它會出現在公開網頁，不是密碼；用途是避免不同租戶把分析、客服或名單誤寫到別站。輪替後舊嵌入碼會立刻失效。</p>
+          <div id="site-create" class="site-create" hidden>
+            <h2>建立新網站</h2>
+            <div class="site-create-grid">
+              <div class="field"><label for="site-new-id">網站代號</label><input id="site-new-id" maxlength="40" placeholder="brand-tw"></div>
+              <div class="field"><label for="site-new-name">網站名稱</label><input id="site-new-name" maxlength="100" placeholder="台灣品牌官網"></div>
+              <div class="field"><label for="site-new-origin">主要網域</label><input id="site-new-origin" type="url" maxlength="500" placeholder="https://example.com"></div>
+              <button id="site-create-button" class="publish" type="button">建立網站</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h2>網站成員</h2>
+          <div id="site-members"></div>
+          <div class="member-add">
+            <input id="member-user-id" maxlength="128" placeholder="Clerk User ID，例如 user_…" aria-label="成員 Clerk User ID">
+            <select id="member-role" aria-label="成員角色"><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="owner">Owner</option></select>
+            <button id="member-add-button" type="button">新增／更新</button>
+          </div>
+          <p class="privacy">Viewer 只能讀取；Editor 可管理內容與訪客資料；Owner 另可管理網站及成員。網站至少保留一位 Owner。</p>
+          <div class="audit-panel"><div class="member-head"><h2>最近管理操作</h2><button id="audit-refresh" type="button">重新整理</button></div><div id="audit-list"></div><p class="privacy">只記錄操作者、動作、目標編號與時間，不保存知識內容、對話、聯絡方式、備註或公開識別碼。</p></div>
+        </div>
+      </div>
+      <p id="sites-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card avatar-settings workspace-page" data-workspace="avatar" aria-labelledby="avatar-settings-title">
+      <div class="avatar-settings-head">
+        <div><h2 id="avatar-settings-title">角色設定中心</h2><p>設定角色、聲線、語氣、外觀與顯示尺寸；草稿不會影響網站上的正式版本。</p></div>
+        <span class="badge" id="avatar-config-live">尚未發布</span>
+      </div>
+      <div class="avatar-settings-layout">
+        <div>
+          <div class="config-grid">
+            <div class="field"><label for="avatar-name">角色名稱</label><input id="avatar-name" maxlength="80" placeholder="AI 虛擬人助理"></div>
+            <div class="field"><label for="avatar-locale">語言</label><select id="avatar-locale"><option value="zh-TW">繁體中文</option><option value="en-US">English</option><option value="ja-JP">日本語</option><option value="ko-KR">한국어</option></select></div>
+            <div class="field"><label for="avatar-mode">角色模式</label><select id="avatar-mode"><option value="assistant">網站助理</option><option value="companion">陪伴模式</option></select></div>
+            <div class="field"><label for="avatar-engine">預設引擎</label><select id="avatar-engine"><option value="2d">Live2D</option><option value="3d">VRM 3D</option></select></div>
+            <div class="field wide"><label for="avatar-model2d">2D 模型網址</label><input id="avatar-model2d" maxlength="1500" placeholder="https://…model3.json 或 /models/avatar/model3.json"></div>
+            <div class="field wide"><label for="avatar-model3d">3D 模型網址</label><input id="avatar-model3d" maxlength="1500" placeholder="https://…avatar.vrm 或 /models/avatar.vrm"></div>
+            <div class="field"><label for="avatar-fit">角色取景</label><select id="avatar-fit"><option value="half">半身</option><option value="full">全身</option></select></div>
+            <div class="field"><label for="avatar-voice">TTS 聲線（可選或自訂）</label><input id="avatar-voice" list="avatar-voice-options" maxlength="80" placeholder="例如 zh-TW-YunJheNeural"><datalist id="avatar-voice-options"><option value="zh-TW-YunJheNeural">繁中男聲（雲哲）</option><option value="zh-TW-HsiaoChenNeural">繁中女聲（曉臻）</option><option value="zh-TW-HsiaoYuNeural">繁中女聲（曉雨）</option><option value="zh-CN-XiaoxiaoNeural">簡中女聲（曉曉）</option><option value="en-US-AriaNeural">英文女聲（Aria）</option><option value="en-US-JennyNeural">英文女聲（Jenny）</option><option value="ja-JP-NanamiNeural">日文女聲（Nanami）</option></datalist></div>
+            <div class="field wide"><label for="avatar-welcome">首次歡迎詞</label><textarea id="avatar-welcome" maxlength="500"></textarea></div>
+            <div class="field wide"><label for="avatar-greeting">點擊角色問候</label><textarea id="avatar-greeting" maxlength="500"></textarea></div>
+            <div class="field wide"><label for="avatar-fallback">知識庫未命中回覆</label><textarea id="avatar-fallback" maxlength="800"></textarea></div>
+            <div class="field wide"><label for="avatar-suggestions">提示問題（每行一題，最多 8 題）</label><textarea id="avatar-suggestions" maxlength="807" placeholder="怎麼使用？&#10;有哪些功能？"></textarea></div>
+            <div class="field"><label for="avatar-brand">品牌色</label><input id="avatar-brand" type="color" value="#5b54e8"></div>
+            <div class="field"><label for="avatar-width">視窗寬度（280–480）</label><input id="avatar-width" type="number" min="280" max="480" step="1"></div>
+            <div class="field"><label for="avatar-height">視窗高度（380–720）</label><input id="avatar-height" type="number" min="380" max="720" step="1"></div>
+            <div class="field"><label for="avatar-config-note">版本備註</label><input id="avatar-config-note" maxlength="240" placeholder="例如：換上正式角色與品牌色"></div>
+          </div>
+          <div class="config-actions">
+            <button id="avatar-preview" class="primary" type="button">驗證並預覽</button>
+            <button id="avatar-save" type="button">儲存設定草稿</button>
+            <button id="avatar-publish" class="publish" type="button">發布角色設定</button>
+          </div>
+          <p id="avatar-config-status" role="status" aria-live="polite">正在載入角色設定…</p>
+          <p class="privacy">模型網址只接受 HTTPS 或站內相對路徑；請確認角色模型與聲線具有可商用或可再散布授權。</p>
+        </div>
+        <aside class="avatar-preview-panel">
+          <div><h2>草稿預覽</h2><p>預覽使用目前表單，不會寫入資料庫。</p></div>
+          <div class="avatar-preview-shell"><iframe id="avatar-preview-frame" title="角色設定草稿預覽" sandbox="allow-scripts allow-same-origin"></iframe></div>
+          <div><h2>設定版本</h2><div id="avatar-config-versions"></div></div>
+        </aside>
+      </div>
+    </section>
+    <section class="card analytics workspace-page" data-workspace="analytics" aria-labelledby="analytics-title">
+      <div class="analytics-head">
+        <div><h2 id="analytics-title">使用分析</h2><p id="analytics-status" role="status" aria-live="polite">正在載入匿名使用數據…</p></div>
+        <div class="analytics-actions">
+          <label for="analytics-days">期間</label>
+          <select id="analytics-days"><option value="7">最近 7 天</option><option value="30" selected>最近 30 天</option><option value="90">最近 90 天</option></select>
+          <button id="analytics-refresh" type="button">重新整理</button>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><strong id="metric-sessions">—</strong><span>對話工作階段</span></div>
+        <div class="metric"><strong id="metric-questions">—</strong><span>收到問題</span></div>
+        <div class="metric"><strong id="metric-fallback">—</strong><span>未命中率</span></div>
+        <div class="metric"><strong id="metric-handoffs">—</strong><span>轉人工需求</span></div>
+      </div>
+      <div class="analytics-grid">
+        <section class="analytics-box"><h3>每日問題趨勢</h3><div id="analytics-trend" class="analytics-list"></div></section>
+        <section class="analytics-box"><h3>熱門問題</h3><div id="analytics-popular" class="analytics-list"></div></section>
+        <section class="analytics-box"><h3>知識庫待補問題</h3><div id="analytics-unanswered" class="analytics-list"></div></section>
+        <section class="analytics-box"><h3>回答來源</h3><div id="analytics-sources" class="analytics-list"></div></section>
+      </div>
+      <p class="privacy">只在設定 <code>data-analytics</code> 時記錄；保存匿名工作階段、問題文字與回答來源，不保存姓名、帳號、IP 或完整回答。請勿在問題中輸入敏感資料。</p>
+    </section>
+    <section class="card leads workspace-page" data-workspace="leads" aria-labelledby="leads-title">
+      <div class="leads-head">
+        <div><h2 id="leads-title">潛在客戶與預約</h2><p id="leads-status" role="status" aria-live="polite">正在載入名單…</p></div>
+        <div class="leads-actions">
+          <label for="leads-filter">狀態</label>
+          <select id="leads-filter"><option value="all">全部</option><option value="new" selected>新名單</option><option value="contacted">已聯絡</option><option value="qualified">有效機會</option><option value="closed">已結束</option></select>
+          <input id="leads-search" type="search" maxlength="120" placeholder="搜尋姓名、聯絡方式或需求" aria-label="搜尋潛在客戶">
+          <button id="leads-refresh" type="button">重新整理</button>
+          <button id="leads-export" type="button">匯出 CSV</button>
+        </div>
+      </div>
+      <div class="leads-layout">
+        <div id="leads-list" class="lead-list" aria-label="潛在客戶列表"></div>
+        <section class="lead-detail" aria-label="潛在客戶詳細資料">
+          <div><h3 id="lead-name">請選擇一筆名單</h3><p id="lead-meta">選擇左側名單後即可查看需求與更新進度。</p></div>
+          <div class="lead-detail-grid">
+            <div class="lead-value"><small>聯絡方式</small><span id="lead-contact">—</span></div>
+            <div class="lead-value"><small>公司／單位</small><span id="lead-company">—</span></div>
+            <div class="lead-value wide"><small>詢價／預約需求</small><span id="lead-request">—</span></div>
+            <div class="lead-value wide"><small>來源頁面</small><span id="lead-source">—</span></div>
+            <div class="lead-value"><small>同意聯繫時間</small><span id="lead-consent">—</span></div>
+            <div class="lead-value"><small>目前負責人</small><span id="lead-assignee">—</span></div>
+          </div>
+          <div class="lead-editor">
+            <div class="field"><label for="lead-status-select">進度</label><select id="lead-status-select" disabled><option value="new">新名單</option><option value="contacted">已聯絡</option><option value="qualified">有效機會</option><option value="closed">已結束</option></select></div>
+            <div class="field"><label for="lead-note">內部備註</label><textarea id="lead-note" maxlength="2000" placeholder="例如：已於 7/16 回電，預計下週確認方案" disabled></textarea></div>
+            <div><button id="lead-update" class="primary" type="button" disabled>儲存進度</button> <button id="lead-delete" class="danger" type="button" disabled>永久刪除</button></div>
+          </div>
+        </section>
+      </div>
+      <p class="privacy">只顯示訪客明確同意後主動送出的資料。請依隱私權政策與內部權限管理使用，完成聯絡目的後應刪除或依保存期限自動清除。</p>
+    </section>
+    <section class="card support workspace-page" data-workspace="support" aria-labelledby="support-title">
+      <div class="support-head">
+        <div><h2 id="support-title">真人客服工作台</h2><p id="support-status" role="status" aria-live="polite">正在載入客服案件…</p></div>
+        <div class="support-head-actions">
+          <label for="support-filter">案件</label>
+          <select id="support-filter"><option value="active">待處理</option><option value="open">未接手</option><option value="assigned">處理中</option><option value="resolved">已結案</option></select>
+          <button id="support-refresh" type="button">重新整理</button>
+        </div>
+      </div>
+      <div class="support-layout">
+        <div id="support-list" class="case-list" aria-label="客服案件列表"></div>
+        <section class="support-detail" aria-label="客服對話">
+          <div class="support-detail-head">
+            <div><h3 id="support-subject">請選擇案件</h3><span id="support-meta">選擇左側案件後即可接手與回覆。</span></div>
+            <div class="support-case-actions"><button id="support-assign" type="button" hidden>接手</button><button id="support-resolve" class="publish" type="button" hidden>結案</button><button id="support-reopen" type="button" hidden>重新開啟</button></div>
+          </div>
+          <div id="support-messages" class="support-messages"><p>尚未選擇客服案件。</p></div>
+          <div class="support-compose">
+            <textarea id="support-reply" maxlength="2000" placeholder="輸入給訪客的回覆，或新增只有管理者看得到的內部備註…" disabled></textarea>
+            <div class="support-compose-actions"><span>內部備註不會顯示給訪客。</span><div><button id="support-note" type="button" disabled>新增內部備註</button> <button id="support-send" class="primary" type="button" disabled>傳送回覆</button></div></div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <div class="grid workspace-page" data-workspace="knowledge">
+      <section class="card" aria-label="編輯知識庫">
+        <div id="status" role="status" aria-live="polite">正在載入知識庫…</div>
+        <details class="source-panel" open>
+          <summary>從文件自動建立知識條目</summary>
+          <div class="source-body">
+            <div class="source-row">
+              <input id="source-url" type="url" inputmode="url" placeholder="https://example.com/help" aria-label="要匯入的 HTTPS 網址">
+              <button id="import-url" type="button">匯入網址</button>
+            </div>
+            <div class="source-row">
+              <input id="source-title" maxlength="160" placeholder="來源名稱，例如：產品使用手冊" aria-label="貼上文字的來源名稱">
+              <label class="file-label">選擇 PDF／文字／JSON<input id="source-file" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,application/json,.json"></label>
+            </div>
+            <textarea id="source-text" maxlength="500000" placeholder="也可以直接貼上 FAQ、說明文件或文章文字…" aria-label="要轉成知識條目的文字"></textarea>
+            <div class="source-row">
+              <span class="source-help">文件會自動切段並建立關鍵字索引；匯入後仍需人工確認再發布。請只匯入你有權使用的內容；掃描圖片型 PDF 需先做 OCR。</span>
+              <button id="import-text" type="button">轉成知識條目</button>
+            </div>
+            <div id="import-status" role="status" aria-live="polite"></div>
+          </div>
+        </details>
+        <div class="field"><label for="note">版本備註</label><input id="note" maxlength="240" placeholder="例如：更新價格與退費政策"></div>
+        <div class="toolbar">
+          <button class="primary" id="validate" type="button">驗證並預覽</button>
+          <button id="save" type="button">儲存草稿</button>
+          <button class="publish" id="publish" type="button">發布新版</button>
+          <label class="file-label">匯入 JSON<input id="file" type="file" accept="application/json,.json"></label>
+          <button id="download" type="button">下載</button>
+          <button id="copy" type="button">複製</button>
+        </div>
+        <textarea id="editor" spellcheck="false" aria-label="知識庫 JSON 編輯區"></textarea>
+        <p class="privacy">草稿與發布版本會寫入永久資料庫。只有按下「發布新版」才會改變公開知識庫。</p>
+      </section>
+      <aside class="side">
+        <section class="card"><h2>版本紀錄</h2><div id="versions"></div></section>
+        <section class="card"><h2>內容預覽</h2><div id="preview"></div></section>
+      </aside>
+    </div>
+    </div>
+      </div>
+    </div>
+  </section>
 </main>
 <script src="knowledge.js"></script>
-<script>
-(function () {
-  'use strict';
-  var editor = document.getElementById('editor');
-  var status = document.getElementById('status');
-  var preview = document.getElementById('preview');
-  editor.value = JSON.stringify(Array.isArray(window.KB) ? window.KB : [], null, 2);
-
-  function parseAndValidate() {
-    var data;
-    try { data = JSON.parse(editor.value); } catch (error) { throw new Error('JSON 格式錯誤：' + error.message); }
-    if (!Array.isArray(data)) throw new Error('最外層必須是陣列。');
-    if (data.length > 1000) throw new Error('最多 1000 筆，請拆成較小的知識庫。');
-    data.forEach(function (item, index) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('第 ' + (index + 1) + ' 筆必須是物件。');
-      ['q', 'a'].forEach(function (key) {
-        if (typeof item[key] !== 'string' || !item[key].trim()) throw new Error('第 ' + (index + 1) + ' 筆缺少非空字串「' + key + '」。');
-      });
-      if (item.kw != null && typeof item.kw !== 'string') throw new Error('第 ' + (index + 1) + ' 筆的「kw」必須是字串。');
-    });
-    return data;
-  }
-
-  function showValidation() {
-    try {
-      var data = parseAndValidate();
-      status.className = 'ok'; status.textContent = '驗證成功：共 ' + data.length + ' 筆，可以下載部署。';
-      preview.replaceChildren();
-      data.slice(0, 30).forEach(function (item) {
-        var box = document.createElement('div'); box.className = 'entry';
-        var q = document.createElement('strong'); q.textContent = item.q;
-        var a = document.createElement('span'); a.textContent = item.a;
-        box.append(q, a); preview.appendChild(box);
-      });
-      if (data.length > 30) { var more = document.createElement('p'); more.textContent = '另有 ' + (data.length - 30) + ' 筆未顯示。'; preview.appendChild(more); }
-      return data;
-    } catch (error) {
-      status.className = 'bad'; status.textContent = error.message; preview.replaceChildren(); return null;
-    }
-  }
-
-  document.getElementById('validate').onclick = showValidation;
-  document.getElementById('file').onchange = function (event) {
-    var file = event.target.files && event.target.files[0]; if (!file) return;
-    file.text().then(function (text) { editor.value = text; showValidation(); }).catch(function (error) { status.className = 'bad'; status.textContent = '讀取失敗：' + error.message; });
-  };
-  document.getElementById('download').onclick = function () {
-    var data = showValidation(); if (!data) return;
-    var url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + '\n'], { type:'application/json' }));
-    var link = document.createElement('a'); link.href = url; link.download = 'knowledge.json'; link.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 0);
-  };
-  document.getElementById('copy').onclick = function () {
-    var data = showValidation(); if (!data) return;
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(function () { status.className = 'ok'; status.textContent = '已複製有效的 JSON。'; });
-  };
-  showValidation();
-})();
-</script>
+<script src="knowledge-builder.js"></script>
+<script src="admin.js" defer></script>
 </body>
 </html>
