@@ -10,7 +10,7 @@
 
 🔗 Live demo: <https://ai-avatar-bot-two.vercel.app> (open in **desktop Chrome**)
 
-![Demo: Live2D voice avatar in the bottom-right corner of a landing page](docs/demo-landing.jpg)
+![Demo: the “Mu” Live2D voice avatar in the bottom-right corner of a landing page](docs/demo-landing.png)
 
 ## 🧭 Operations dashboard
 

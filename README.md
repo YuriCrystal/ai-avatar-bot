@@ -10,7 +10,7 @@
 
 🔗 線上 Demo：<https://ai-avatar-bot-two.vercel.app>（請用 **Chrome 桌機**開啟）
 
-![Demo：landing 頁右下角的 Live2D 語音虛擬人](docs/demo-landing.jpg)
+![Demo：landing 頁右下角的「木」Live2D 語音虛擬人](docs/demo-landing.png)
 
 > 線上／本機 DEMO 目前使用 Live2D V 皮「木（免費版）」，由專案持有人自 **bilibili 工房取得／購買**。模型由獨立的 Vercel 靜態資產站提供，沒有提交到此 GitHub repo，也不包含在本專案程式碼的 MIT 授權內。瀏覽器為了顯示角色仍需公開讀取資產網址；這不代表訪客取得修改、商用或再散布授權，實際權利依原作者及商品頁條款為準。
 
