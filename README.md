@@ -285,6 +285,8 @@ vercel --prod          # 本機開發：vercel dev
 
 ### 正式後台設定
 
+> 公開線上 Demo 使用 Vercel Hobby 方案，因此 repo 內的 `.vercelignore` 會在 Demo 部署時排除完整後台 API，只保留 TTS；`admin.html?preview=1` 仍可查看唯讀示範。若要部署完整後台，請移除其中的 `api/admin/` 與各公開 API 排除規則，並使用可容納目前函式數量的方案／平台，或先把 API 合併成較少的函式。
+
 1. 從 Vercel Marketplace 安裝 Clerk 與 Neon，讓 Vercel 自動注入登入和 `DATABASE_URL`。
 2. 依 `.env.example` 補上全域管理者 `ADMIN_USER_IDS` 與 `ADMIN_ALLOWED_ORIGINS`；User ID 可在 Clerk Dashboard 的 Users 頁面取得。其他網站成員登入後由 Owner 在後台加入。
 3. 本機用 `vercel env pull .env.local --yes` 同步環境變數，再執行 `vercel dev`。

@@ -203,6 +203,8 @@ Site Owners can inspect recent publishing, restore, lead, support, membership, a
 
 ### Production dashboard setup
 
+> The public hosted demo runs on Vercel Hobby, so this repo's `.vercelignore` excludes the complete dashboard APIs from that deployment and keeps only TTS; `admin.html?preview=1` remains available with read-only sample data. To deploy the full backend, remove the `api/admin/` and public-API exclusions, then use a plan/platform that supports the current function count or consolidate the routes into fewer functions.
+
 1. Install Clerk and Neon from Vercel Marketplace so Vercel injects authentication settings and `DATABASE_URL`.
 2. Fill `ADMIN_USER_IDS` and `ADMIN_ALLOWED_ORIGINS` from `.env.example`. Site Owners add other members after they first sign in.
 3. For local work, run `vercel env pull .env.local --yes`, then `vercel dev`.

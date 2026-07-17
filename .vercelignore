@@ -1,3 +1,15 @@
 # Proprietary / locally licensed character assets are deployed from a separate
 # asset-only Vercel project and must never be bundled with the open-source app.
 models/
+
+# The public hosted demo runs on the Vercel Hobby plan. Keep the complete
+# backend open source in GitHub, but deploy only the TTS function so the demo
+# stays below the plan's Serverless Function limit. The dashboard remains
+# available through admin.html?preview=1 with local sample data.
+api/admin/
+api/avatar-config.js
+api/events.js
+api/handoff.js
+api/health.js
+api/knowledge.js
+api/leads.js
