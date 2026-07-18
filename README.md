@@ -10,6 +10,16 @@
 
 🔗 線上 Demo：<https://ai-avatar-bot-two.vercel.app>（請用 **Chrome 桌機**開啟）
 
+## ☕ 支持開源與付費協助
+
+核心程式會持續以開源方式分享。你可以單純贊助開發，也可以選擇需要實際投入時間的付費協助：
+
+- [☕ 贊助開源開發](https://ko-fi.com/yuricrystal)
+- [🧑‍💻 一對一 AI 虛擬人安裝教學 — US$59](https://ko-fi.com/c/6d12b36a8f)
+- [🛠️ AI 虛擬人基礎代客安裝 — US$149](https://ko-fi.com/c/96de6a2cc1)
+
+> 贊助用於支持主機、AI 服務、文件與後續實驗，不包含個別技術服務；教學與代客安裝的範圍、交付時間及買家須知請以 Ko-fi 服務頁為準。
+
 ![Demo：landing 頁右下角的「木」Live2D 語音虛擬人](docs/demo-landing.png)
 
 > 線上／本機 DEMO 目前使用 Live2D V 皮「木（免費版）」，由專案持有人自 **bilibili 工房取得／購買**。模型由獨立的 Vercel 靜態資產站提供，沒有提交到此 GitHub repo，也不包含在本專案程式碼的 MIT 授權內。瀏覽器為了顯示角色仍需公開讀取資產網址；這不代表訪客取得修改、商用或再散布授權，實際權利依原作者及商品頁條款為準。

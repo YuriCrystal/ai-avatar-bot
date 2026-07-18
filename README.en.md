@@ -10,6 +10,16 @@
 
 🔗 Live demo: <https://ai-avatar-bot-two.vercel.app> (open in **desktop Chrome**)
 
+## ☕ Support and Paid Help
+
+The core project remains open source. You can support ongoing development or choose paid help when you need hands-on assistance:
+
+- [☕ Support open-source development](https://ko-fi.com/yuricrystal)
+- [🧑‍💻 1-on-1 AI avatar setup session — US$59](https://ko-fi.com/c/6d12b36a8f)
+- [🛠️ Done-for-you AI avatar installation — US$149](https://ko-fi.com/c/96de6a2cc1)
+
+> Tips help cover hosting, AI services, documentation, and future experiments; they do not include individual technical support. See each Ko-fi service page for scope, delivery times, and buyer instructions.
+
 ![Demo: the “Mu” Live2D voice avatar in the bottom-right corner of a landing page](docs/demo-landing.png)
 
 ## 🧭 Operations dashboard
