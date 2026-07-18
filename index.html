@@ -24,6 +24,12 @@
   .note { font-size:13px; color:#6a7b8b; line-height:1.7; }
   .credit { border-left:4px solid #8c78e8; background:#f5f2ff; }
   .credit strong { color:#43378f; }
+  .support-card { border:1px solid #ded8ff; background:linear-gradient(135deg,#f8f6ff,#eef6fb); }
+  .support-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+  .support-link { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:9px 14px; border-radius:10px; font-weight:700; text-decoration:none; }
+  .support-link.primary { background:#5b54e8; color:#fff; }
+  .support-link.secondary { background:#fff; color:#43378f; border:1px solid #cfc6ff; }
+  @media (max-width:520px) { .support-actions { flex-direction:column; } .support-link { width:100%; } }
   kbd { background:#f1f4f7; border:1px solid #dde3e9; border-radius:5px; padding:1px 7px; font-size:13px; }
   a { color:#2f6d8f; }
 </style>
@@ -42,6 +48,16 @@
         <li>點 <b>🎙️ 即時</b> → 允許麥克風 → 直接連續對話；他回答時也能插話打斷。不方便開麥仍可<b>直接打字</b>，例如「<b>怎麼裝到我的網站</b>」「<b>怎麼換成我的角色</b>」。</li>
         <li>想讓他更聰明、能自然閒聊：點 <b>🧠</b> 啟用「AI 大腦」（首次會下載約 1GB 模型，之後就快了）。</li>
       </ol>
+    </div>
+
+    <div class="card support-card" aria-labelledby="support-title">
+      <h2 id="support-title">☕ 支持開源，或讓我協助你完成安裝</h2>
+      <p class="note">這個專案會持續開源分享。單純贊助可支持主機、AI 服務、文件與後續實驗；如果你需要實際協助，也可以選擇一對一教學或基礎代客安裝。贊助本身不包含個別技術服務。</p>
+      <div class="support-actions">
+        <a class="support-link primary" href="https://ko-fi.com/yuricrystal" target="_blank" rel="noopener noreferrer">☕ 贊助開源開發</a>
+        <a class="support-link secondary" href="https://ko-fi.com/c/6d12b36a8f" target="_blank" rel="noopener noreferrer">🧑‍💻 一對一教學 · US$59</a>
+        <a class="support-link secondary" href="https://ko-fi.com/c/96de6a2cc1" target="_blank" rel="noopener noreferrer">🛠️ 代客安裝 · US$149</a>
+      </div>
     </div>
 
     <div class="card">
