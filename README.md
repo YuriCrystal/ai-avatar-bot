@@ -2,6 +2,8 @@
 
 **繁體中文** | [English](README.en.md)
 
+[![Support Yuri Crystal Builds on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/yuricrystal)
+
 > 一個「一行 `<script>` 嵌入任何網站」的右下角 Live2D 語音 AI 虛擬人元件。
 > 你可以對虛擬人說話，角色會聽懂、回答、開口說話並即時對嘴。
 >
